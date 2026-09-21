@@ -50,22 +50,11 @@
 
 ## 怎么打开客户端
 
-### 方式一：绿色版（推荐，双击即用）
-
-已打包好免安装版本，直接双击：
-
-```
-D:\migumusic\dist\咪咕音乐\咪咕音乐.exe
-```
-
-不需要 Node、不需要命令行、不需要联网安装；整个 `咪咕音乐` 文件夹可拷到 U 盘或别的电脑直接用。
-想放桌面：右键 `咪咕音乐.exe` → **发送到** → **桌面快捷方式**。
-
-### 方式二：双击启动脚本
+### 方式一：双击启动脚本
 
 双击项目根目录的 `启动咪咕音乐.cmd`，脚本会自动检查依赖并启动。
 
-### 方式三：命令行
+### 方式二：命令行
 
 ```bash
 npm start
@@ -462,23 +451,6 @@ res.data.lrcUrl  // 歌词地址（LRC）
 ## 开源协议
 
 [MIT](LICENSE)
-
-## 推送到 GitHub
-
-仓库已经初始化好（本地 `main` 分支，含首个提交）。在 GitHub 上建一个**空仓库**（别勾
-Add README / .gitignore / license），然后：
-
-```powershell
-# 方式一：用附带脚本（会先做一次安全兜底检查）
-.\publish-github.ps1 -Repo 你的用户名/仓库名
-
-# 方式二：手动
-git remote add origin https://github.com/你的用户名/仓库名.git
-git push -u origin main
-```
-
-> 首次推送要求认证时，**密码处填 Personal Access Token**（需 `repo` 权限），不是账号登录密码。
-> 也可以用 SSH：`git remote add origin git@github.com:用户名/仓库名.git`
 
 ## 参与贡献
 
