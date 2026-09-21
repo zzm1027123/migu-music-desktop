@@ -1,0 +1,17 @@
+node_modules/
+
+# 打包产物（600MB+，含 Electron 运行时）
+dist/
+
+# 运行时数据：登录 Cookie、日志、设置 —— 绝对不要提交
+.userdata/
+.userdata-*/
+.electron-cache/
+
+# 临时/诊断产物
+.playwright-mcp/
+.tmp-*
+*-output.txt
+
+# 根目录下的临时截图（要发布的图放在 docs/screenshots/）
+/screenshot-*.png

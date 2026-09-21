@@ -1,0 +1,33 @@
+{
+  "name": "migu-music-desktop",
+  "version": "1.0.0",
+  "description": "咪咕音乐 PC 客户端（登录 / 搜索 / 排行榜 / 在线播放）",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build:portable": "node build-portable.mjs",
+    "smoke": "electron . --smoke",
+    "tray-test": "electron . --tray-test",
+    "test:lyric": "electron test-lyric.js",
+    "test:single": "powershell -ExecutionPolicy Bypass -File test-single-instance.ps1",
+    "test:log": "electron test-log.js",
+    "test:log-clean": "electron test-log-clean.js",
+    "test:suggest": "electron test-suggest.js",
+    "test:playlist": "electron test-playlist.js",
+    "check:cookies": "electron check-cookies.js",
+    "icons": "node make-icons.mjs",
+    "selftest": "electron selftest.js",
+    "test:api": "node test-api.js",
+    "test:vip": "electron test-vip.js",
+    "verify:vip": "electron verify-vip.js",
+    "check:login": "electron login-check.js"
+  },
+  "keywords": ["migu", "music", "electron"],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "electron": "^44.4.3"
+  }
+}

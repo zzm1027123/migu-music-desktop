@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' https: data:; media-src 'self' https: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>咪咕音乐</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- 顶栏 -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">咪</div>
+      <div class="brand-text">
+        <b>咪咕音乐</b>
+        <span>PC 客户端</span>
+      </div>
+    </div>
+
+    <div class="searchbox">
+      <svg viewBox="0 0 24 24" class="ico"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"/></svg>
+      <input id="searchInput" type="text" placeholder="搜索歌曲、歌手、专辑" autocomplete="off" />
+      <button class="clear-btn" id="clearSearchBtn" title="清除搜索内容">
+        <svg viewBox="0 0 24 24"><path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"/></svg>
+      </button>
+      <button id="searchBtn">搜索</button>
+      <div class="suggest-panel" id="suggestPanel"></div>
+    </div>
+
+    <div class="top-right">
+      <button class="icon-btn gear" id="settingsBtn" title="设置">
+        <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.488.488 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
+      </button>
+      <div class="user-area" id="userArea">
+        <button class="btn-login" id="loginBtn">登录</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- 侧栏 -->
+    <aside class="sidebar">
+      <nav class="nav">
+        <div class="nav-item active" data-view="home">
+          <span class="dot"></span>发现音乐
+        </div>
+        <div class="nav-item" data-view="ranks">
+          <span class="dot"></span>排行榜
+        </div>
+        <div class="nav-item" data-view="search">
+          <span class="dot"></span>搜索结果
+        </div>
+        <div class="nav-item" data-view="mymusic">
+          <span class="dot"></span>我的音乐
+        </div>
+      </nav>
+
+      <div class="side-block">
+        <div class="side-title">音质</div>
+        <select id="toneSel" class="select">
+          <option value="LQ">流畅 LQ</option>
+          <option value="PQ" selected>标准 PQ</option>
+          <option value="HQ">高清 HQ</option>
+          <option value="SQ">无损 SQ</option>
+        </select>
+        <p class="hint">可播放性由咪咕版权决定，会自动降级音质。</p>
+      </div>
+
+      <div class="side-block">
+        <div class="side-title">播放列表 <span id="queueCount" class="badge">0</span></div>
+        <div id="queueList" class="queue"></div>
+      </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main" id="view"></main>
+  </div>
+
+  <!-- 播放条 -->
+  <footer class="player">
+    <div class="now" id="nowBox">
+      <div class="cover-wrap" id="coverWrap">
+        <div class="now-cover" id="nowCover"></div>
+        <!-- 歌词相关操作：平时隐藏，鼠标靠近封面时浮现 -->
+        <div class="cover-actions">
+          <button class="icon-btn mini" id="lyricBtn" title="歌词面板">
+            <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z"/></svg>
+          </button>
+          <button class="icon-btn mini" id="desktopLyricBtn" title="桌面歌词（悬浮字幕）">
+            <svg viewBox="0 0 24 24"><path d="M3 5h18v13H3zm2 2v9h14V7zm1.5 2.2h11v1.6h-11zm0 3h7.5v1.6H6.5z"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="now-meta">
+        <div class="now-name" id="nowName">未在播放</div>
+        <div class="now-artist" id="nowArtist">选择一首歌开始</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="btns">
+        <button class="icon-btn" id="prevBtn" title="上一首">
+          <svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
+        </button>
+        <button class="icon-btn play" id="playBtn" title="播放/暂停">
+          <svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <button class="icon-btn" id="nextBtn" title="下一首">
+          <svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>
+        </button>
+      </div>
+      <div class="progress">
+        <span id="curTime">00:00</span>
+        <input type="range" id="seek" min="0" max="1000" value="0" step="1" />
+        <span id="durTime">00:00</span>
+      </div>
+    </div>
+
+    <div class="right-tools">
+      <button class="icon-btn" id="modeBtn" title="播放模式">
+        <svg viewBox="0 0 24 24" id="modeIcon"><path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/></svg>
+      </button>
+      <div class="volume">
+        <svg viewBox="0 0 24 24" class="ico"><path d="M3 10v4h4l5 5V5L7 10H3zm13.5 2a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
+        <input type="range" id="volume" min="0" max="100" value="70" />
+      </div>
+    </div>
+  </footer>
+
+  <!-- 全屏歌词页 -->
+  <div class="lyric-drawer" id="lyricDrawer">
+    <div class="lyric-side">
+      <div class="lp-cover" id="lpCover"></div>
+      <div class="lp-meta">
+        <div class="lp-name" id="lpName">未在播放</div>
+        <div class="lp-artist" id="lpArtist">选择一首歌开始</div>
+      </div>
+    </div>
+    <div class="lyric-main">
+      <button class="icon-btn lp-close" id="lyricClose" title="关闭歌词">✕</button>
+      <div class="lyric-seek-tip" id="lyricSeekTip"></div>
+      <div class="lyric-body" id="lyricBody">暂无歌词</div>
+      <button class="lyric-follow-btn" id="lyricFollowBtn">⤓ 回到当前</button>
+    </div>
+  </div>
+
+  <!-- 设置 -->
+  <div class="modal-mask" id="settingsMask">
+    <div class="modal">
+      <div class="modal-head">
+        <b>设置</b>
+        <button class="icon-btn" id="settingsClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="set-row">
+          <div class="set-label">
+            <b>关闭窗口时最小化到系统托盘</b>
+            <span>开启后点窗口右上角 ✕ 不会退出，音乐继续播放，可从托盘图标重新打开</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="setTray" />
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="set-row">
+          <div class="set-label">
+            <b>默认音质</b>
+            <span>当前账号放不了所选音质时会自动降级</span>
+          </div>
+          <select id="setTone" class="select">
+            <option value="LQ">流畅 LQ</option>
+            <option value="PQ">标准 PQ</option>
+            <option value="HQ">高清 HQ</option>
+            <option value="SQ">无损 SQ</option>
+          </select>
+        </div>
+
+        <div class="set-row">
+          <div class="set-label">
+            <b>音量</b>
+            <span>下次启动沿用这个音量</span>
+          </div>
+          <input type="range" id="setVolume" min="0" max="100" value="70" />
+        </div>
+
+        <div class="set-row">
+          <div class="set-label">
+            <b>运行日志</b>
+            <span id="logPathText">记录启动、登录、播放解析等信息，遇到问题时可发给开发者</span>
+          </div>
+          <div class="log-actions">
+            <button class="btn-ghost small" id="openLogBtn">打开日志文件</button>
+            <button class="btn-ghost small" id="openLogDirBtn" title="在文件资源管理器中显示">文件夹</button>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <div class="set-label">
+            <b>清理旧日志</b>
+            <span id="logStatsText">正在统计…</span>
+          </div>
+          <div class="log-actions">
+            <select class="select small" id="logRetention">
+              <option value="7">保留最近 7 天</option>
+              <option value="30">保留最近 30 天</option>
+              <option value="0">不自动清理</option>
+            </select>
+            <button class="btn-ghost small" id="cleanLogBtn">立即清理</button>
+          </div>
+        </div>
+
+        <div class="set-actions">
+          <button class="btn-ghost" id="setMinimize">立即最小化到托盘</button>
+          <button class="btn-ghost danger" id="setQuit">彻底退出程序</button>
+        </div>
+        <p class="set-note">退出程序请用上面的按钮或托盘右键菜单；直接点窗口 ✕ 默认只是收进托盘。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 加入歌单 -->
+  <div class="modal-mask" id="playlistMask">
+    <div class="modal pl-modal">
+      <div class="modal-head">
+        <b>加入歌单</b>
+        <button class="icon-btn" id="playlistClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="pl-song" id="plSong"></div>
+        <div class="pl-list" id="plList"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 提示 -->
+  <div class="toast" id="toast"></div>
+
+  <audio id="audio" preload="auto"></audio>
+
+  <script src="app.js"></script>
+</body>
+</html>

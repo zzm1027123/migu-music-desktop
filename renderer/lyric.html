@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>桌面歌词</title>
+  <style>
+    html, body {
+      height: 100%; margin: 0; overflow: hidden; background: transparent;
+      user-select: none; -webkit-user-select: none;
+    }
+    body {
+      display: flex; align-items: center; justify-content: center;
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+      -webkit-app-region: drag; /* 按住任意位置可拖动 */
+      cursor: move;
+      padding: 10px 18px;
+      box-sizing: border-box;
+    }
+    #box { max-width: 100%; text-align: center; }
+
+    #cur {
+      font-size: 30px; font-weight: 700; line-height: 1.35;
+      color: #fff; letter-spacing: .5px;
+      text-shadow: 0 0 2px #000, 0 0 6px rgba(0,0,0,.9), 0 2px 6px rgba(0,0,0,.85),
+                   1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000;
+      transition: font-size .15s;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #next {
+      margin-top: 6px; font-size: 16px; color: rgba(255,255,255,.72);
+      text-shadow: 0 0 2px #000, 0 0 5px rgba(0,0,0,.85), 1px 1px 0 rgba(0,0,0,.9);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      transition: font-size .15s;
+    }
+    body.idle #cur { color: rgba(255,255,255,.62); font-weight: 500; }
+
+    /* 控制条：默认半透明常驻，鼠标移上去变清晰，方便发现可点 */
+    #tools {
+      position: fixed; top: 6px; right: 8px;
+      display: flex; gap: 6px;
+      opacity: .3; transition: opacity .18s;
+      -webkit-app-region: no-drag;
+    }
+    body:hover #tools { opacity: 1; }
+    body.locked #tools { opacity: 0 !important; pointer-events: none; }
+    #tools button {
+      display: inline-flex; align-items: center; gap: 4px;
+      height: 26px; padding: 0 10px; border-radius: 7px; cursor: pointer;
+      font-size: 12px; font-family: inherit; white-space: nowrap;
+      color: #fff; border: 1px solid rgba(255,255,255,.28);
+      background: rgba(18,20,32,.82); backdrop-filter: blur(6px);
+    }
+    #tools button:hover { background: #ff2d55; border-color: #ff2d55; }
+    #tools button svg { width: 12px; height: 12px; fill: currentColor; }
+  </style>
+</head>
+<body class="idle">
+  <div id="box">
+    <div id="cur">咪咕音乐 · 桌面歌词</div>
+    <div id="next"></div>
+  </div>
+
+  <div id="tools">
+    <button data-act="font-" title="减小字号">A−</button>
+    <button data-act="font+" title="增大字号">A+</button>
+    <button data-act="lock" title="锁定后鼠标穿透，不再挡住其它窗口">
+      <svg viewBox="0 0 24 24"><path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5zm-3 8V6a3 3 0 1 1 6 0v3H9zm3 4a2 2 0 0 1 1 3.7V19a1 1 0 1 1-2 0v-2.3A2 2 0 0 1 12 13z"/></svg>
+      锁定
+    </button>
+    <button data-act="close" title="关闭桌面歌词">
+      <svg viewBox="0 0 24 24"><path d="M18.3 5.7 12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"/></svg>
+      关闭
+    </button>
+  </div>
+
+  <script src="lyric.js"></script>
+</body>
+</html>
