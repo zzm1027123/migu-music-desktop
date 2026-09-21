@@ -23,8 +23,8 @@
     "verify:vip": "electron verify-vip.js",
     "check:login": "electron login-check.js"
   },
-  "keywords": ["migu", "music", "electron"],
-  "author": "",
+  "keywords": ["migu", "music", "electron", "desktop", "player"],
+  "author": "migu-music-desktop contributors",
   "license": "MIT",
   "type": "commonjs",
   "devDependencies": {

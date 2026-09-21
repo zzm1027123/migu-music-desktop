@@ -461,6 +461,23 @@ res.data.lrcUrl  // 歌词地址（LRC）
 
 [MIT](LICENSE)
 
+## 推送到 GitHub
+
+仓库已经初始化好（本地 `main` 分支，含首个提交）。在 GitHub 上建一个**空仓库**（别勾
+Add README / .gitignore / license），然后：
+
+```powershell
+# 方式一：用附带脚本（会先做一次安全兜底检查）
+.\publish-github.ps1 -Repo 你的用户名/仓库名
+
+# 方式二：手动
+git remote add origin https://github.com/你的用户名/仓库名.git
+git push -u origin main
+```
+
+> 首次推送要求认证时，**密码处填 Personal Access Token**（需 `repo` 权限），不是账号登录密码。
+> 也可以用 SSH：`git remote add origin git@github.com:用户名/仓库名.git`
+
 ## 参与贡献
 
 欢迎提 Issue / PR。改动前建议先跑一遍自检：
