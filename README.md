@@ -14,6 +14,8 @@
 | --- | --- |
 | ![桌面歌词](docs/screenshots/desktop-lyric.png) | ![设置](docs/screenshots/settings.png) |
 
+> 发布到 GitHub 时用的仓库简介 / 详细描述文案见 [`docs/DESCRIPTION.md`](docs/DESCRIPTION.md)。
+
 ---
 
 ## 功能
