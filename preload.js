@@ -16,7 +16,10 @@ contextBridge.exposeInMainWorld('migu', {
 
   // 我的歌单 / 收藏
   myPlaylists: () => ipcRenderer.invoke('playlist:mine'),
+  createPlaylist: (title) => ipcRenderer.invoke('playlist:create', title),
   addToPlaylist: (musicListId, contentIds) => ipcRenderer.invoke('playlist:add', musicListId, contentIds),
+  removeFromPlaylist: (musicListId, contentIds) =>
+    ipcRenderer.invoke('playlist:remove', musicListId, contentIds),
   checkInPlaylists: (ids) => ipcRenderer.invoke('playlist:check', ids),
   playlistSongs: (id, pageNo, pageSize) => ipcRenderer.invoke('playlist:songs', id, pageNo, pageSize),
   playlistAllSongs: (id) => ipcRenderer.invoke('playlist:allSongs', id),

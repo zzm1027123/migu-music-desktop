@@ -62,7 +62,8 @@ const PLACEHOLDER =
 
 /* --------------------------------------------------------- 歌曲渲染 */
 
-function songRowsHtml(songs, startIndex = 0) {
+function songRowsHtml(songs, startIndex = 0, opts = {}) {
+  const removable = !!opts.removable;
   return songs
     .map((s, i) => {
       const idx = startIndex + i;
@@ -79,6 +80,13 @@ function songRowsHtml(songs, startIndex = 0) {
           <button class="mini-act add-pl" title="加入歌单">
             <svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
           </button>
+          ${
+            removable
+              ? `<button class="mini-act remove-pl" title="从这个歌单移出">
+            <svg viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg>
+          </button>`
+              : ''
+          }
         </div>
       </div>`;
     })
@@ -157,6 +165,14 @@ function bindSongList(container, songs, opts = {}) {
         e.stopPropagation();
         const s = songs[Number(row.dataset.i)];
         if (s) openPlaylistPicker(s);
+      });
+    }
+    const rmBtn = row.querySelector('.remove-pl');
+    if (rmBtn && opts.onRemove) {
+      rmBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const s = songs[Number(row.dataset.i)];
+        if (s) opts.onRemove(s, songs);
       });
     }
   });
@@ -1116,6 +1132,26 @@ function bindUi() {
     if (e.target === $('#playlistMask')) $('#playlistMask').classList.remove('show');
   });
 
+  // 新建歌单弹窗
+  const closeNewPl = () => {
+    $('#newPlMask').classList.remove('show');
+    newPlAfterCreate = null;
+  };
+  $('#newPlClose').addEventListener('click', closeNewPl);
+  $('#newPlCancel').addEventListener('click', closeNewPl);
+  $('#newPlMask').addEventListener('click', (e) => {
+    if (e.target === $('#newPlMask')) closeNewPl();
+  });
+  $('#newPlOk').addEventListener('click', submitNewPlaylist);
+  $('#newPlName').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      submitNewPlaylist();
+    } else if (e.key === 'Escape') {
+      closeNewPl();
+    }
+  });
+
   // 日志
   $('#openLogBtn').addEventListener('click', async () => {
     try {
@@ -1206,15 +1242,69 @@ function bindUi() {
   });
 }
 
+/* --------------------------------------------------------- 新建歌单 */
+
+let newPlAfterCreate = null;
+let newPlBusy = false;
+
+/**
+ * 打开新建歌单弹窗。
+ * @param {(id:string, title:string) => any} [onCreated] 建好之后的后续动作（例如把刚选的歌加进去）
+ */
+function openNewPlaylistDialog(onCreated, hint) {
+  newPlAfterCreate = onCreated || null;
+  $('#newPlHint').textContent = hint || '给歌单起个名字（最多 40 个字）';
+  const input = $('#newPlName');
+  input.value = '';
+  $('#newPlMask').classList.add('show');
+  setTimeout(() => input.focus(), 60);
+}
+
+async function submitNewPlaylist() {
+  if (newPlBusy) return;
+  const input = $('#newPlName');
+  const title = input.value.trim();
+  if (!title) {
+    toast('歌单名不能为空');
+    input.focus();
+    return;
+  }
+
+  const btn = $('#newPlOk');
+  newPlBusy = true;
+  btn.disabled = true;
+  btn.textContent = '创建中…';
+  try {
+    const r = await window.migu.createPlaylist(title);
+    if (r && r.ok) {
+      $('#newPlMask').classList.remove('show');
+      toast(`歌单「${title}」已创建`, 2600);
+      const cb = newPlAfterCreate;
+      newPlAfterCreate = null;
+      if (cb) await cb(r.id, title);
+    } else if (r && r.needLogin) {
+      toast('登录状态已失效，请重新登录后再试', 3600);
+    } else {
+      toast('创建失败：' + ((r && r.error) || '未知错误'), 3600);
+    }
+  } catch (e) {
+    toast('创建失败：' + (e.message || e), 3600);
+  } finally {
+    newPlBusy = false;
+    btn.disabled = false;
+    btn.textContent = '创建';
+  }
+}
+
 /* --------------------------------------------------------- 我的音乐 */
 
-function playlistCardHtml(p, isFav) {
+function playlistCardHtml(p, isFav, mine) {
   const cover = p.cover
     ? `<img src="${esc(p.cover)}" onerror="this.style.display='none'" alt="">`
     : `<div class="pl-cover-fav">♥</div>`;
   return `<div class="card pl-card" data-pl="${esc(p.id)}" data-title="${esc(p.title)}"${
     isFav ? ' data-fav="1"' : ''
-  }>
+  }${mine ? ' data-mine="1"' : ''}>
     <div class="c-cover">${cover}
       <div class="c-play" title="把当前播放列表加入这个歌单">
         <svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
@@ -1222,6 +1312,15 @@ function playlistCardHtml(p, isFav) {
     </div>
     <div class="c-name">${esc(p.title)}</div>
     <div class="c-sub">${isFav ? p.count + ' 首' : (p.count || 0) + ' 首'}</div>
+  </div>`;
+}
+
+/** 「我的歌单」区里那张虚线的新建卡片 */
+function newPlaylistCardHtml() {
+  return `<div class="card pl-card pl-new" data-new="1" data-title="新建歌单">
+    <div class="c-cover"><div class="pl-cover-fav">＋</div></div>
+    <div class="c-name">新建歌单</div>
+    <div class="c-sub">创建一个自己的歌单</div>
   </div>`;
 }
 
@@ -1264,10 +1363,13 @@ async function playWholePlaylist(playlistId, title) {
   }
 }
 
-/** 歌单详情：列出里面的歌曲（每页 20 首） */
-async function renderPlaylistDetail(playlistId, title, pageNo = 1) {
+/** 歌单详情：列出里面的歌曲（每页 20 首）
+ *  opts.removable 为真时每行显示「移出」按钮；opts.isFav 表示这是「我喜欢的」 */
+async function renderPlaylistDetail(playlistId, title, pageNo = 1, opts = {}) {
   state.view = 'playlistDetail';
   view.innerHTML = loadingHtml('正在读取歌单…');
+  const removable = !!opts.removable;
+  const isFav = !!opts.isFav;
   const back = `<div class="back-bar"><button class="back-btn" id="backBtn">← 返回我的音乐</button></div>`;
   const bindBack = () => {
     const b = $('#backBtn');
@@ -1288,24 +1390,56 @@ async function renderPlaylistDetail(playlistId, title, pageNo = 1) {
        <div class="page-sub">共 ${r.total} 首 · 每页 ${r.pageSize} 首 · 第 ${r.page}/${r.totalPages} 页</div>
        <div class="pl-actions">
          <button class="btn-primary" id="playAllBtn">▶ 播放全部（${r.total} 首）</button>
-         <span class="pl-actions-hint">点歌时会自动把整个歌单放进播放列表，随机播放可覆盖全部</span>
+         <span class="pl-actions-hint">${
+           removable
+             ? '点歌时会自动把整个歌单放进播放列表；行尾的 − 可以把这首歌移出歌单'
+             : '点歌时会自动把整个歌单放进播放列表，随机播放可覆盖全部'
+         }</span>
        </div>
-       <div class="song-list" id="plSongList">${songRowsHtml(r.songs, start)}</div>
+       <div class="song-list${removable ? ' removable' : ''}" id="plSongList">${songRowsHtml(r.songs, start, { removable })}</div>
        ${pagerHtml(r.page, r.totalPages, r.total)}`;
     bindBack();
     bindSongList($('#plSongList'), r.songs, {
       onPlay: (songs, i) => playFromPlaylist(playlistId, songs, i),
+      onRemove: removable
+        ? (song, pageSongs) => removeSongFromPlaylist(playlistId, title, song, pageNo, pageSongs.length, isFav)
+        : null,
     });
     const playAll = $('#playAllBtn');
     if (playAll) playAll.addEventListener('click', () => playWholePlaylist(playlistId, title));
     bindPager(view, (p) => {
       view.scrollTop = 0;
-      renderPlaylistDetail(playlistId, title, p);
+      renderPlaylistDetail(playlistId, title, p, opts);
     });
   } catch (e) {
     view.innerHTML =
       back + `<div class="page-title">${esc(title)}</div>` + emptyHtml('读取失败：' + esc(e.message || e));
     bindBack();
+  }
+}
+
+/**
+ * 把一首歌移出当前歌单。
+ * 「我喜欢的」要传空 id —— 咪咕那边它是收藏，走的是不带 id 的分支。
+ */
+async function removeSongFromPlaylist(playlistId, title, song, pageNo, pageCount, isFav) {
+  if (!song || !song.contentId) return;
+  const target = isFav ? '' : playlistId;
+  toast(`正在把《${song.name}》移出「${title}」…`, 1800);
+  try {
+    const r = await window.migu.removeFromPlaylist(target, [song.contentId]);
+    if (r && r.ok) {
+      toast(`已把《${song.name}》移出「${title}」`, 2600);
+      // 这一页被搬空且不是第一页时，退一页，别让用户看到空白
+      const nextPage = pageCount <= 1 && pageNo > 1 ? pageNo - 1 : pageNo;
+      renderPlaylistDetail(playlistId, title, nextPage, { removable: true, isFav });
+    } else if (r && r.needLogin) {
+      toast('登录状态已失效，请重新登录后再试', 3600);
+    } else {
+      toast('移出失败：' + ((r && r.error) || '未知错误'), 3600);
+    }
+  } catch (e) {
+    toast('移出失败：' + (e.message || e), 3600);
   }
 }
 
@@ -1317,11 +1451,29 @@ async function renderMyMusic() {
     const [auth, r] = await Promise.all([window.migu.authStatus(), window.migu.myPlaylists()]);
 
     if (!r || !r.ok) {
+      // 登录态失效时，服务端只会回一句「参数校验失败」，直接显示等于没说
+      const needLogin = (r && r.needLogin) || !(auth && auth.loggedIn);
       view.innerHTML =
         `<div class="page-title">我的音乐</div>` +
         emptyHtml(
-          (r && r.error) || (auth && auth.loggedIn ? '读取歌单失败' : '请先登录后再查看我的歌单')
-        );
+          needLogin
+            ? '登录状态已失效，重新登录后就能看到你的歌单了'
+            : '读取歌单失败：' + esc((r && r.error) || '未知错误')
+        ) +
+        (needLogin
+          ? '<div class="login-cta"><button class="btn-login" id="mmLogin">重新登录</button></div>'
+          : '');
+      const lb = document.getElementById('mmLogin');
+      if (lb) {
+        lb.addEventListener('click', async () => {
+          toast('已打开登录窗口，请在弹出的窗口中完成登录');
+          try {
+            await window.migu.login();
+          } catch (e) {
+            toast('打开登录窗口失败：' + (e.message || e));
+          }
+        });
+      }
       return;
     }
 
@@ -1346,25 +1498,31 @@ async function renderMyMusic() {
     html += `<div class="section-title">我喜欢的</div><div class="grid">`;
     html += playlistCardHtml(
       { id: r.favoriteId || '', title: '我喜欢的', count: r.favoriteCount || 0, cover: '' },
+      true,
       true
     );
     html += `</div>`;
 
     if (r.created.length) {
       html += `<div class="section-title">我的歌单</div><div class="grid">`;
-      html += r.created.map((p) => playlistCardHtml(p)).join('');
+      html += newPlaylistCardHtml();
+      html += r.created.map((p) => playlistCardHtml(p, false, true)).join('');
       html += `</div>`;
     } else {
-      html += `<div class="section-title">我的歌单</div>` + emptyHtml('还没有自建歌单（可以在咪咕里先建一个）');
+      html += `<div class="section-title">我的歌单</div><div class="grid">`;
+      html += newPlaylistCardHtml();
+      html += `</div>`;
+      html += `<p class="pl-hint">还没有自建歌单 —— 点上面的「新建歌单」就能建一个。</p>`;
     }
 
     if (r.collected.length) {
       html += `<div class="section-title">收藏的歌单</div><div class="grid">`;
+      // 收藏来的歌单是别人的，不给「移出」入口
       html += r.collected.map((p) => playlistCardHtml(p)).join('');
       html += `</div>`;
     }
 
-    html += `<p class="pl-hint">点歌单卡片可以查看里面的歌曲；鼠标移到封面的 <b>＋</b> 上，可以把<b>当前播放列表</b>一次性加进去。</p>`;
+    html += `<p class="pl-hint">点歌单卡片可以查看里面的歌曲；鼠标移到封面的 <b>＋</b> 上，可以把<b>当前播放列表</b>一次性加进去；在自己歌单里可以把单曲移出。</p>`;
 
     view.innerHTML = html;
 
@@ -1373,6 +1531,11 @@ async function renderMyMusic() {
         const id = card.dataset.pl;
         const title = card.dataset.title;
         const isFav = card.dataset.fav === '1';
+        const mine = card.dataset.mine === '1';
+        if (card.dataset.new === '1') {
+          openNewPlaylistDialog(() => renderMyMusic());
+          return;
+        }
         if (e.target.closest && e.target.closest('.c-play')) {
           e.stopPropagation();
           addQueueToPlaylist(isFav ? '' : id, title);
@@ -1382,7 +1545,7 @@ async function renderMyMusic() {
           toast('没取到这个歌单的 id，无法查看', 3000);
           return;
         }
-        renderPlaylistDetail(id, title);
+        renderPlaylistDetail(id, title, 1, { removable: mine, isFav: isFav && mine });
       });
     });
   } catch (e) {
@@ -1426,7 +1589,9 @@ async function openPlaylistPicker(song) {
     const r = await window.migu.myPlaylists();
     if (!r || !r.ok) {
       box.innerHTML = `<div class="suggest-empty">${esc(
-        (r && r.error) || '读取歌单失败，请确认已登录'
+        (r && r.needLogin)
+          ? '登录状态已失效，请先重新登录再收藏歌曲'
+          : (r && r.error) || '读取歌单失败，请确认已登录'
       )}</div>`;
       return;
     }
@@ -1444,11 +1609,23 @@ async function openPlaylistPicker(song) {
     } else {
       html += '<div class="suggest-empty">还没有自建歌单，可以加入到「我喜欢的」</div>';
     }
+    // 允许现场建一个再加入，省得先去别处建好再回来
+    html += `<div class="pl-item pl-new-item" data-new="1">
+      <div class="pl-meta"><b>＋ 新建歌单并加入</b></div>
+    </div>`;
     box.innerHTML = html;
     box.querySelectorAll('.pl-item').forEach((el) => {
-      el.addEventListener('click', () =>
-        doAddToPlaylist(el.dataset.id, el.querySelector('b').textContent)
-      );
+      el.addEventListener('click', () => {
+        if (el.dataset.new === '1') {
+          $('#playlistMask').classList.remove('show');
+          openNewPlaylistDialog(
+            (id, title) => doAddToPlaylist(id, title),
+            `新建一个歌单，并把《${plTargetSong ? plTargetSong.name : '这首歌'}》加进去`
+          );
+          return;
+        }
+        doAddToPlaylist(el.dataset.id, el.querySelector('b').textContent);
+      });
     });
   } catch (e) {
     box.innerHTML = `<div class="suggest-empty">${esc(e.message || '读取歌单失败')}</div>`;
@@ -1564,7 +1741,11 @@ function renderAuth(auth) {
 
 window.migu.onAuthChanged((auth) => {
   renderAuth(auth);
-  if (auth.loggedIn) toast('登录成功' + (auth.nickname ? '，欢迎 ' + auth.nickname : ''));
+  if (auth.loggedIn) {
+    toast('登录成功' + (auth.nickname ? '，欢迎 ' + auth.nickname : ''));
+    // 如果用户是停在「我的音乐」页点的重新登录，登录成功后就地把歌单读出来
+    if (state.view === 'mymusic' && view.querySelector('.login-cta')) renderMyMusic();
+  }
 });
 
 /* -------------------------------------------------------------- 启动 */

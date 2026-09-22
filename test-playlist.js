@@ -27,10 +27,15 @@ const say = (m = '') => {
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 let failed = 0;
+let skipped = 0;
 const ok = (m) => say('  [PASS] ' + m);
 const bad = (m) => {
   failed++;
   say('  [FAIL] ' + m);
+};
+const skip = (m) => {
+  skipped++;
+  say('  [SKIP] ' + m);
 };
 
 registerIpc({
@@ -63,7 +68,12 @@ app.whenReady().then(async () => {
 
     say('[1] 读取我的歌单');
     const mine = await playlist.getMyPlaylists();
-    if (!mine.ok) {
+    let loggedIn = true;
+    if (mine.needLogin) {
+      loggedIn = false;
+      skip('当前未登录（或登录已过期）—— 歌单功能必须登录后才能验证');
+      say('      接口已把服务端的「参数校验失败」翻译成 needLogin，界面会显示「重新登录」引导');
+    } else if (!mine.ok) {
       bad('读取失败：' + mine.error);
     } else {
       ok(`我喜欢的 ${mine.favoriteCount} 首；自建歌单 ${mine.created.length} 个；收藏歌单 ${mine.collected.length} 个`);
@@ -130,7 +140,31 @@ app.whenReady().then(async () => {
     if (panel.open) ok('点按钮后弹出歌单选择框');
     else bad('弹窗没有出现');
     if (panel.items.length) ok(`弹窗里列出了 ${panel.items.length} 个歌单：${panel.items.map((x) => x.title).join(' / ')}`);
+    else if (!loggedIn) skip('未登录时弹窗不列歌单是预期行为（面板里已提示需重新登录）');
     else bad('弹窗里没有歌单');
+
+    say('\n[5] 未登录时「我的音乐」页的引导');
+    await win.webContents.executeJavaScript(
+      `(()=>{document.querySelector('.nav-item[data-view="mymusic"]').click();return 1})()`,
+      true
+    );
+    await wait(6000);
+    const mm = JSON.parse(
+      await win.webContents.executeJavaScript(
+        `JSON.stringify({
+           empty: document.querySelector('.empty') ? document.querySelector('.empty').textContent : '',
+           relogin: document.getElementById('mmLogin') ? document.getElementById('mmLogin').textContent : ''
+         })`,
+        true
+      )
+    );
+    say('      ' + JSON.stringify(mm));
+    if (mm.relogin) {
+      ok(`未登录/失效时给出「${mm.relogin}」按钮，提示语：${mm.empty}`);
+      if (/参数校验|299999/.test(mm.empty)) bad('又把服务端的晦涩报错直接显示出来了');
+    } else if (!loggedIn) {
+      bad('未登录时缺少重新登录入口：' + mm.empty);
+    }
 
     const img = await win.webContents.capturePage();
     fs.writeFileSync(path.join(__dirname, 'screenshot-playlist.png'), img.toPNG());
@@ -139,7 +173,7 @@ app.whenReady().then(async () => {
     bad('异常 ' + (e && e.stack ? e.stack : e));
   }
 
-  say('\n=== ' + (failed ? failed + ' 项失败' : '歌单功能验证通过') + ' ===');
+  say('\n=== ' + (failed ? failed + ' 项失败' : '歌单功能验证通过') + (skipped ? `（${skipped} 项因未登录跳过）` : '') + ' ===');
   try {
     win.destroy();
   } catch {}

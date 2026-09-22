@@ -234,6 +234,24 @@
     </div>
   </div>
 
+  <!-- 新建歌单 -->
+  <div class="modal-mask" id="newPlMask">
+    <div class="modal pl-modal">
+      <div class="modal-head">
+        <b>新建歌单</b>
+        <button class="icon-btn" id="newPlClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="new-pl-hint" id="newPlHint">给歌单起个名字（最多 40 个字）</div>
+        <input class="new-pl-input" id="newPlName" maxlength="40" placeholder="例如：深夜循环" />
+        <div class="new-pl-actions">
+          <button class="btn-ghost" id="newPlCancel">取消</button>
+          <button class="btn-primary" id="newPlOk">创建</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 提示 -->
   <div class="toast" id="toast"></div>
 

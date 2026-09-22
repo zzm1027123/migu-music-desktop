@@ -69,7 +69,11 @@ function registerIpc(ctx) {
 
   // 我的歌单 / 收藏
   ipcMain.handle('playlist:mine', () => playlist.getMyPlaylists());
+  ipcMain.handle('playlist:create', (_e, title) => playlist.createPlaylist(title));
   ipcMain.handle('playlist:add', (_e, musicListId, contentIds) => playlist.addSongs(musicListId, contentIds));
+  ipcMain.handle('playlist:remove', (_e, musicListId, contentIds) =>
+    playlist.removeSongs(musicListId, contentIds)
+  );
   ipcMain.handle('playlist:check', (_e, ids) => playlist.checkInPlaylists(ids));
   ipcMain.handle('playlist:songs', (_e, id, pageNo, pageSize) =>
     playlist.getPlaylistSongs(id, pageNo, pageSize)

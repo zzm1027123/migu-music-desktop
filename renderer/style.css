@@ -286,6 +286,9 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 
 .empty { text-align: center; color: var(--text-3); padding: 60px 0; font-size: 13.5px; }
 
+/* 登录态失效时给出的「重新登录」引导按钮 */
+.login-cta { text-align: center; margin-top: -34px; padding-bottom: 40px; }
+
 .loading { text-align: center; padding: 60px 0; color: var(--text-3); font-size: 13px; }
 .spinner {
   width: 26px; height: 26px; margin: 0 auto 12px;
@@ -590,11 +593,32 @@ input[type="range"]::-webkit-slider-thumb {
 .pl-meta { min-width: 0; }
 .pl-meta b { display: block; font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pl-meta span { font-size: 11.5px; color: var(--text-3); }
+
+/* 新建歌单 */
+.new-pl-hint { font-size: 12.5px; color: var(--text-3); margin-bottom: 10px; }
+.new-pl-input {
+  width: 100%; box-sizing: border-box;
+  background: var(--panel-2, #1b2036); color: inherit;
+  border: 1px solid var(--line, #2c3250); border-radius: 8px;
+  padding: 9px 11px; font-size: 13.5px; outline: none;
+}
+.new-pl-input:focus { border-color: var(--brand); }
+.new-pl-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+/* .btn-ghost 默认是 flex:1（给设置面板两个按钮平分用的），这里要恢复自然宽度 */
+.new-pl-actions .btn-ghost { flex: none; padding: 0 18px; border-radius: 999px; }
+/* 「我的歌单」区里那张虚线的新建卡片 */
+.pl-card.pl-new { border: 1px dashed var(--line, #2c3250); background: transparent; }
+.pl-card.pl-new:hover { border-color: var(--brand); }
+.pl-card.pl-new .pl-cover-fav { background: transparent; color: var(--text-3); font-size: 30px; }
+.pl-card.pl-new:hover .pl-cover-fav { color: var(--brand); }
+/* 「加入歌单」弹窗底部的「新建并加入」 */
+.pl-item.pl-new-item { justify-content: center; color: var(--text-3); }
+.pl-item.pl-new-item:hover { color: var(--brand); }
 .pl-group { font-size: 10.5px; color: var(--text-3); letter-spacing: 1.2px; padding: 10px 10px 4px; }
 
 /* 歌曲行里的「加入歌单」小按钮 */
 .song-row { grid-template-columns: 44px 44px 1fr 1fr 116px 76px 34px; }
-.s-act { display: flex; justify-content: flex-end; opacity: 0; transition: opacity .15s; }
+.s-act { display: flex; justify-content: flex-end; gap: 4px; opacity: 0; transition: opacity .15s; }
 .song-row:hover .s-act { opacity: 1; }
 .mini-act {
   width: 26px; height: 26px; border-radius: 7px;
@@ -602,6 +626,9 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .mini-act:hover { background: var(--brand); color: #fff; }
 .mini-act svg { width: 15px; height: 15px; fill: currentColor; }
+/* 可移出歌曲的歌单：操作列要放下「加入」和「移出」两个按钮 */
+.song-list.removable .song-row { grid-template-columns: 44px 44px 1fr 1fr 116px 76px 62px; }
+.mini-act.remove-pl:hover { background: #c0453f; color: #fff; }
 
 /* --------------------------------------------------------- 我的音乐 */
 .mymusic-head {

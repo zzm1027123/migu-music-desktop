@@ -29,12 +29,41 @@ function normList(x) {
   };
 }
 
+/**
+ * 判断一次失败是不是「登录态没了」。
+ *
+ * 咪咕在未登录时的提示很不直观：
+ *   - home-page 这类接口因为拿不到 uid，回的是「请求错误，参数校验失败」；
+ *   - 另一些接口才老实回「请先登录」(290001)。
+ * 这两种都要翻译成用户能看懂的话，否则界面上只会显示一句莫名其妙的参数错误。
+ */
+const NEED_LOGIN_RE = /请先登录|未登录|登录已过期|参数校验失败/;
+function isNeedLogin(code, info) {
+  return String(code || '') === '290001' || NEED_LOGIN_RE.test(String(info || ''));
+}
+
+function needLoginResult(extra = {}) {
+  return {
+    ok: false,
+    needLogin: true,
+    error: '登录状态已失效，请重新登录',
+    songs: [],
+    total: 0,
+    totalPages: 0,
+    ...extra,
+  };
+}
+
 /** 我喜欢的 / 自建歌单 / 收藏的歌单 */
 async function getMyPlaylists() {
   const r = await resolver.webCall('/pc/user/home-page/v2.0');
   const res = r && r.res;
   if (!r || !r.ok || !res || res.code !== '000000') {
     const info = (res && res.info) || r.err || '获取歌单失败';
+    if (isNeedLogin(res && res.code, info)) {
+      logger.warn('[歌单] 未登录或登录已过期，无法读取我的歌单');
+      return needLoginResult({ created: [], collected: [], favoriteCount: 0 });
+    }
     logger.warn('[歌单] 获取我的歌单失败：' + info);
     return { ok: false, error: info, created: [], collected: [], favoriteCount: 0 };
   }
@@ -163,6 +192,10 @@ async function addSongs(musicListId, contentIds) {
   const res = r && r.res;
   if (!r || !r.ok || !res || res.code !== '000000') {
     const info = (res && res.info) || r.err || '添加失败';
+    if (isNeedLogin(res && res.code, info)) {
+      logger.warn('[歌单] 未登录或登录已过期，无法加入歌单');
+      return { ok: false, needLogin: true, error: '登录状态已失效，请重新登录' };
+    }
     logger.warn(`[歌单] 添加失败（目标=${musicListId || '我喜欢的'}）：${info}`);
     return { ok: false, error: info };
   }
@@ -177,6 +210,87 @@ async function addSongs(musicListId, contentIds) {
   return { ok: true, successNum, repeated, failed, total: ids.length };
 }
 
+/**
+ * 新建歌单。
+ *
+ * 走的是 `/pc/open/api/music-list/add/v2.0`（网页版建歌单用的就是这支），
+ * 必须带 channel / type，否则服务端会当成非法来源。
+ *
+ * @param {string} title 歌单名
+ * @returns {{ok:boolean, id?:string, title?:string, error?:string, needLogin?:boolean}}
+ */
+async function createPlaylist(title) {
+  const name = String(title || '').trim();
+  if (!name) return { ok: false, error: '歌单名不能为空' };
+  if (name.length > 40) return { ok: false, error: '歌单名太长了（最多 40 个字）' };
+
+  const r = await resolver.webCall(
+    '/pc/open/api/music-list/add/v2.0',
+    { title: name, channel: '23', type: 'self_build' },
+    'post'
+  );
+  const res = r && r.res;
+  if (!r || !r.ok || !res || res.code !== '000000') {
+    const code = String((res && res.code) || '');
+    const info = (res && res.info) || r.err || '创建失败';
+    if (isNeedLogin(code, info)) {
+      logger.warn('[歌单] 未登录或登录已过期，无法新建歌单');
+      return { ok: false, needLogin: true, error: '登录状态已失效，请重新登录' };
+    }
+    // 这几个是网页版自己会翻译的常见错误，原样透出去太难看
+    if (code === '100001') return { ok: false, error: '已经有同名歌单了，换个名字吧' };
+    if (code === '299999') return { ok: false, error: '歌单名不合法，换一个试试' };
+    logger.warn(`[歌单] 新建歌单失败（${name}）：${code} ${info}`);
+    return { ok: false, error: info };
+  }
+
+  // 接口不一定回 id，没回就捞一次列表把它找出来
+  const d = res.data || {};
+  let id = d.musicListId || d.id || '';
+  if (!id) {
+    const mine = await getMyPlaylists();
+    const found = (mine.created || []).find((p) => p.title === name);
+    if (found) id = found.id;
+  }
+
+  logger.info(`[歌单] 已新建歌单「${name}」（id=${id || '未取到'}）`);
+  return { ok: true, id, title: name };
+}
+
+/**
+ * 把歌曲移出歌单。
+ *
+ * 咪咕没有独立的「移除歌曲」接口 —— 网页版用的是同一支
+ * `/pc/user/h5-import-musiclist/v1.0`，靠 songflag 区分动作：
+ *   songflag "0" = 修改歌单名，"2" = 移除歌曲，"3" = 其它
+ * （见网页版 BulkOperation / 播放器里的「不喜欢」逻辑）
+ *
+ * @param {string} musicListId 歌单 id；传空表示「我喜欢的」
+ * @param {string[]} contentIds 要移出的歌曲
+ */
+async function removeSongs(musicListId, contentIds) {
+  const ids = (contentIds || []).filter(Boolean);
+  if (!ids.length) return { ok: false, error: '没有可移除的歌曲' };
+
+  const body = { channel: '23', songflag: '2', contentId: ids.join('|') };
+  if (musicListId) body.id = String(musicListId);
+
+  const r = await resolver.webCall('/pc/user/h5-import-musiclist/v1.0', body, 'post');
+  const res = r && r.res;
+  if (!r || !r.ok || !res || res.code !== '000000') {
+    const info = (res && res.info) || r.err || '移除失败';
+    if (isNeedLogin(res && res.code, info)) {
+      logger.warn('[歌单] 未登录或登录已过期，无法移出歌单');
+      return { ok: false, needLogin: true, error: '登录状态已失效，请重新登录' };
+    }
+    logger.warn(`[歌单] 移出失败（歌单=${musicListId || '我喜欢的'}）：${info}`);
+    return { ok: false, error: info };
+  }
+
+  logger.info(`[歌单] 已从 ${musicListId || '我喜欢的'} 移出 ${ids.length} 首`);
+  return { ok: true, removed: ids.length };
+}
+
 /** 查询这些歌曲分别在哪些歌单里 / 是否已在我喜欢 */
 async function checkInPlaylists(contentIds) {
   const ids = (contentIds || []).filter(Boolean);
@@ -187,7 +301,9 @@ async function checkInPlaylists(contentIds) {
   });
   const res = r && r.res;
   if (!r || !r.ok || !res || res.code !== '000000') {
-    return { lists: [], favMap: {} };
+    const info = (res && res.info) || r.err || '';
+    if (isNeedLogin(res && res.code, info)) logger.warn('[歌单] 未登录，无法查询歌曲所在歌单');
+    return { lists: [], favMap: {}, needLogin: isNeedLogin(res && res.code, info) };
   }
   const od = res.originData || {};
   const favMap = {};
@@ -198,7 +314,9 @@ async function checkInPlaylists(contentIds) {
 
 module.exports = {
   getMyPlaylists,
+  createPlaylist,
   addSongs,
+  removeSongs,
   checkInPlaylists,
   getPlaylistSongs,
   getAllPlaylistSongs,
