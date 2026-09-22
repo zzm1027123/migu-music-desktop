@@ -26,6 +26,7 @@ logger.init(USER_DATA);
 
 // 设置也要在日志清理之前就绪（保留天数从这里读）
 const settings = require('./src/settings');
+const { LOGIN_TICKET_NAMES, persistLoginTickets } = require('./src/login-tickets');
 settings.init(USER_DATA);
 initLoginDir();
 
@@ -520,6 +521,8 @@ async function finishLogin(reason) {
   authState.since = Date.now();
   authState.cookies = cookies;
   authState.cookieKeys = added.map((c) => c.name + '@' + c.domain);
+  // 会话级票据在进程退出时会被 Chromium 丢掉，先加固成持久 Cookie 再落盘
+  await persistLoginTickets(session.defaultSession).catch(() => {});
   saveAuthFile();
   stopLoginWatch();
   logger.info(`[登录] 登录成功（${reason}）昵称=${authState.nickname || '(未获取)'} 新增Cookie=${added.length}个`);
@@ -622,9 +625,8 @@ async function logout() {
  * 注意：绝不能因为「没匹配上记录的 Cookie」就直接登出 ——
  * 咪咕的 idmpauth / mg_auth_sid 这类票据会过期轮换，
  * 早期版本一旦匹配失败就删 auth.json，会把还在有效期的登录态误清掉。
+ * （LOGIN_TICKET_NAMES / persistLoginTickets 在 src/login-tickets.js，供这里与加固逻辑共用。）
  */
-const LOGIN_TICKET_NAMES = ['idmpauth', 'pacmtoken', 'mg_auth_sid', 'migu-utoken-sessionid', 'migu-utoken'];
-
 async function checkAuth() {
   const saved = loadAuthFile();
   if (saved && saved.loggedIn && Array.isArray(saved.cookieKeys) && saved.cookieKeys.length) {
@@ -638,6 +640,7 @@ async function checkAuth() {
       authState.userId = saved.userId || '';
       authState.cookieKeys = saved.cookieKeys;
       authState.since = saved.since || 0;
+      persistLoginTickets(session.defaultSession).catch(() => {}); // 后台加固，不拖慢界面
       return { ...authState, restored: true };
     }
   }
@@ -650,6 +653,8 @@ async function checkAuth() {
     authState.cookieKeys = cookies.map((c) => c.name + '@' + c.domain);
     authState.since = Date.now();
     authState.cookies = cookies;
+    // 恢复出来的票据往往也是会话级，顺手加固，避免下次启动又掉
+    await persistLoginTickets(session.defaultSession).catch(() => {});
     saveAuthFile();
     logger.info(`[登录] 依据登录票据恢复登录态（${ticket.name}），auth.json 已重建`);
     return { ...authState, recovered: true };
