@@ -241,6 +241,21 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 }
 .card:hover .c-cover .c-play { opacity: 1; transform: none; }
 .card .c-play svg { width: 17px; height: 17px; fill: #fff; }
+/*
+ * 歌单封面右上角的删除按钮。
+ * 只在鼠标移到**封面**上时出现（不是整张卡片，符合「鼠标放在封面上才显示」）。
+ */
+.card .c-cover .c-del {
+  position: absolute; right: 8px; top: 8px;
+  width: 26px; height: 26px; padding: 0; border-radius: 50%;
+  background: rgba(16,19,31,.84); color: #cfd6e8; cursor: pointer;
+  display: grid; place-items: center;
+  border: 1px solid rgba(255,255,255,.16);
+  opacity: 0; transform: translateY(-6px); transition: all .18s;
+}
+.card .c-cover:hover .c-del { opacity: 1; transform: none; }
+.card .c-cover .c-del:hover { background: #c0453f; color: #fff; border-color: transparent; }
+.card .c-cover .c-del svg { width: 13px; height: 13px; fill: currentColor; }
 .card .c-name { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .card .c-sub { font-size: 11.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -539,6 +554,10 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 15px;
 }
 .modal-body { padding: 8px 18px 18px; }
+
+/* 确认弹窗：比常规弹窗窄一些，用于删除这类破坏性操作 */
+.confirm-modal { width: 400px; }
+.confirm-text { font-size: 13px; color: var(--text-2); line-height: 1.75; padding-top: 8px; }
 
 .set-row {
   display: flex; align-items: center; justify-content: space-between; gap: 18px;

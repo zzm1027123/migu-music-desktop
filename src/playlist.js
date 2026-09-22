@@ -258,6 +258,34 @@ async function createPlaylist(title) {
 }
 
 /**
+ * 删除整个歌单。
+ *
+ * 网页版删歌单用的是 `/pc/v1.0/user/deleteMusicList.do`，GET，只要 channel + id。
+ * 注意这是删**歌单**，不是删里面的歌 —— 歌曲本身还在曲库里。
+ *
+ * @param {string} musicListId
+ */
+async function deletePlaylist(musicListId) {
+  const id = String(musicListId || '').trim();
+  if (!id) return { ok: false, error: '缺少歌单 id' };
+
+  const r = await resolver.webCall('/pc/v1.0/user/deleteMusicList.do', { channel: '23', id });
+  const res = r && r.res;
+  if (!r || !r.ok || !res || res.code !== '000000') {
+    const info = (res && res.info) || r.err || '删除失败';
+    if (isNeedLogin(res && res.code, info)) {
+      logger.warn('[歌单] 未登录或登录已过期，无法删除歌单');
+      return { ok: false, needLogin: true, error: '登录状态已失效，请重新登录' };
+    }
+    logger.warn(`[歌单] 删除歌单失败（id=${id}）：${(res && res.code) || ''} ${info}`);
+    return { ok: false, error: info };
+  }
+
+  logger.info(`[歌单] 已删除歌单 id=${id}`);
+  return { ok: true, id };
+}
+
+/**
  * 把歌曲移出歌单。
  *
  * 咪咕没有独立的「移除歌曲」接口 —— 网页版用的是同一支
@@ -315,6 +343,7 @@ async function checkInPlaylists(contentIds) {
 module.exports = {
   getMyPlaylists,
   createPlaylist,
+  deletePlaylist,
   addSongs,
   removeSongs,
   checkInPlaylists,

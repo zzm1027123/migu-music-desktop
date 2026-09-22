@@ -70,6 +70,7 @@ function registerIpc(ctx) {
   // 我的歌单 / 收藏
   ipcMain.handle('playlist:mine', () => playlist.getMyPlaylists());
   ipcMain.handle('playlist:create', (_e, title) => playlist.createPlaylist(title));
+  ipcMain.handle('playlist:delete', (_e, id) => playlist.deletePlaylist(id));
   ipcMain.handle('playlist:add', (_e, musicListId, contentIds) => playlist.addSongs(musicListId, contentIds));
   ipcMain.handle('playlist:remove', (_e, musicListId, contentIds) =>
     playlist.removeSongs(musicListId, contentIds)

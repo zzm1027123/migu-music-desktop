@@ -1160,6 +1160,16 @@ function bindUi() {
     }
   });
 
+  // 通用确认弹窗
+  $('#confirmOk').addEventListener('click', () => closeConfirm(true));
+  $('#confirmCancel').addEventListener('click', () => closeConfirm(false));
+  $('#confirmMask').addEventListener('click', (e) => {
+    if (e.target === $('#confirmMask')) closeConfirm(false);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('#confirmMask').classList.contains('show')) closeConfirm(false);
+  });
+
   // 日志
   $('#openLogBtn').addEventListener('click', async () => {
     try {
@@ -1250,6 +1260,31 @@ function bindUi() {
   });
 }
 
+/* --------------------------------------------------------- 通用确认弹窗 */
+
+let confirmResolve = null;
+
+/** 弹一个确认框，返回用户是否点了确定 */
+function askConfirm(title, text, okText) {
+  return new Promise((resolve) => {
+    // 上一次还没答完就再来一次：把上一次当作取消，避免 Promise 永远悬着
+    if (confirmResolve) confirmResolve(false);
+    confirmResolve = resolve;
+    $('#confirmTitle').textContent = title;
+    $('#confirmText').textContent = text;
+    $('#confirmOk').textContent = okText || '确定';
+    $('#confirmMask').classList.add('show');
+    setTimeout(() => $('#confirmOk').focus(), 60);
+  });
+}
+
+function closeConfirm(answer) {
+  $('#confirmMask').classList.remove('show');
+  const r = confirmResolve;
+  confirmResolve = null;
+  if (r) r(!!answer);
+}
+
 /* --------------------------------------------------------- 新建歌单 */
 
 let newPlAfterCreate = null;
@@ -1306,7 +1341,8 @@ async function submitNewPlaylist() {
 
 /* --------------------------------------------------------- 我的音乐 */
 
-function playlistCardHtml(p, isFav, mine) {
+function playlistCardHtml(p, opts = {}) {
+  const { isFav = false, mine = false, deletable = false } = opts;
   const cover = p.cover
     ? `<img src="${esc(p.cover)}" onerror="this.style.display='none'" alt="">`
     : `<div class="pl-cover-fav">♥</div>`;
@@ -1314,6 +1350,13 @@ function playlistCardHtml(p, isFav, mine) {
     isFav ? ' data-fav="1"' : ''
   }${mine ? ' data-mine="1"' : ''}>
     <div class="c-cover">${cover}
+      ${
+        deletable
+          ? `<button class="c-del" title="删除这个歌单">
+        <svg viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+      </button>`
+          : ''
+      }
       <div class="c-play" title="把当前播放列表加入这个歌单">
         <svg viewBox="0 0 24 24"><path d="M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6z"/></svg>
       </div>
@@ -1451,6 +1494,35 @@ async function removeSongFromPlaylist(playlistId, title, song, pageNo, pageCount
   }
 }
 
+/**
+ * 删除歌单（封面右上角的 ✕）。
+ * 破坏性操作，先确认；删的是歌单本身，里面的歌还在咪咕曲库里。
+ */
+async function deletePlaylistFlow(id, title) {
+  if (!id) return toast('没取到这个歌单的 id，无法删除');
+  const yes = await askConfirm(
+    '删除歌单',
+    `确定要删除歌单「${title}」吗？\n这个歌单会被整个删掉，无法恢复；歌单里的歌曲不会从咪咕曲库消失。`,
+    '删除'
+  );
+  if (!yes) return;
+
+  toast(`正在删除「${title}」…`, 2000);
+  try {
+    const r = await window.migu.deletePlaylist(id);
+    if (r && r.ok) {
+      toast(`歌单「${title}」已删除`, 2800);
+      renderMyMusic();
+    } else if (r && r.needLogin) {
+      toast('登录状态已失效，请重新登录后再试', 3600);
+    } else {
+      toast('删除失败：' + ((r && r.error) || '未知错误'), 3600);
+    }
+  } catch (e) {
+    toast('删除失败：' + (e.message || e), 3600);
+  }
+}
+
 async function renderMyMusic() {
   state.view = 'mymusic';
   setNav('mymusic');
@@ -1504,17 +1576,17 @@ async function renderMyMusic() {
       </div>`;
 
     html += `<div class="section-title">我喜欢的</div><div class="grid">`;
+    // 「我喜欢的」是系统歌单，不能删，所以不给 deletable
     html += playlistCardHtml(
       { id: r.favoriteId || '', title: '我喜欢的', count: r.favoriteCount || 0, cover: '' },
-      true,
-      true
+      { isFav: true, mine: true }
     );
     html += `</div>`;
 
     if (r.created.length) {
       html += `<div class="section-title">我的歌单</div><div class="grid">`;
       html += newPlaylistCardHtml();
-      html += r.created.map((p) => playlistCardHtml(p, false, true)).join('');
+      html += r.created.map((p) => playlistCardHtml(p, { mine: true, deletable: true })).join('');
       html += `</div>`;
     } else {
       html += `<div class="section-title">我的歌单</div><div class="grid">`;
@@ -1525,12 +1597,12 @@ async function renderMyMusic() {
 
     if (r.collected.length) {
       html += `<div class="section-title">收藏的歌单</div><div class="grid">`;
-      // 收藏来的歌单是别人的，不给「移出」入口
+      // 收藏来的歌单是别人的，不给「移出」也不给「删除」
       html += r.collected.map((p) => playlistCardHtml(p)).join('');
       html += `</div>`;
     }
 
-    html += `<p class="pl-hint">点歌单卡片可以查看里面的歌曲；鼠标移到封面的 <b>＋</b> 上，可以把<b>当前播放列表</b>一次性加进去；在自己歌单里可以把单曲移出。</p>`;
+    html += `<p class="pl-hint">点歌单卡片可以查看里面的歌曲；把鼠标移到封面上，<b>＋</b> 可以把<b>当前播放列表</b>一次性加进去，<b>✕</b> 可以删掉这个歌单；进歌单后还能把单曲移出。</p>`;
 
     view.innerHTML = html;
 
@@ -1542,6 +1614,11 @@ async function renderMyMusic() {
         const mine = card.dataset.mine === '1';
         if (card.dataset.new === '1') {
           openNewPlaylistDialog(() => renderMyMusic());
+          return;
+        }
+        if (e.target.closest && e.target.closest('.c-del')) {
+          e.stopPropagation();
+          deletePlaylistFlow(id, title);
           return;
         }
         if (e.target.closest && e.target.closest('.c-play')) {

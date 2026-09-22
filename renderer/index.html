@@ -252,6 +252,22 @@
     </div>
   </div>
 
+  <!-- 操作确认（删除歌单这类破坏性操作） -->
+  <div class="modal-mask" id="confirmMask">
+    <div class="modal confirm-modal">
+      <div class="modal-head">
+        <b id="confirmTitle">确认</b>
+      </div>
+      <div class="modal-body">
+        <div class="confirm-text" id="confirmText"></div>
+        <div class="new-pl-actions">
+          <button class="btn-ghost" id="confirmCancel">取消</button>
+          <button class="btn-primary" id="confirmOk">确定</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- 提示 -->
   <div class="toast" id="toast"></div>
 
