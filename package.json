@@ -17,6 +17,7 @@
     "test:playlist": "electron test-playlist.js",
     "test:remove": "electron test-remove.js",
     "test:create": "electron test-create-playlist.js",
+    "test:playable": "electron test-playable.js",
     "test:ticket": "electron test-ticket-persist.js",
     "check:cookies": "electron check-cookies.js",
     "icons": "node make-icons.mjs",

@@ -281,8 +281,20 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 }
 .tag-lock { color: #8b93a8; border: 1px solid rgba(139,147,168,.5); }
 .tag-trial { color: #4aa8ff; border: 1px solid rgba(74,168,255,.5); }
-.song-row.restricted { opacity: .55; }
+/*
+ * 不能播放的歌曲：整行转灰。
+ * 只靠 opacity 会连带把「受限」标签也淡掉，标签就不显眼了，
+ * 所以这里以「文字变灰 + 封面去色」为主，opacity 只做轻微压暗。
+ */
+.song-row.restricted { opacity: .8; }
+.song-row.restricted .s-name,
+.song-row.restricted .s-artist,
+.song-row.restricted .s-album { color: var(--text-3); }
+.song-row.restricted .s-idx,
+.song-row.restricted .s-dur { color: #545c74; }
+.song-row.restricted .s-cover { filter: grayscale(1) brightness(.72); }
 .song-row.restricted:hover { opacity: 1; }
+.song-row.restricted .tag-lock { color: #9aa3bd; border-color: rgba(154,163,189,.65); }
 
 .empty { text-align: center; color: var(--text-3); padding: 60px 0; font-size: 13.5px; }
 

@@ -100,7 +100,11 @@ let markToken = 0;
  * 让用户在点歌之前就知道哪些歌当前账号放不了。
  */
 async function markRestricted(container, songs) {
-  if (!window.migu.canListen) return;
+  // 别静默跳过：之前 preload 漏了 canListen 的接线，这行 return 把问题藏了很久
+  if (!window.migu.canListen) {
+    console.warn('[标灰] preload 未暴露 canListen，已跳过后端可播放性标注');
+    return;
+  }
   const ids = songs.map((s) => s.contentId).filter(Boolean).slice(0, 60);
   if (!ids.length) return;
   const token = ++markToken;

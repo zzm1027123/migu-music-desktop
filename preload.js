@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('migu', {
 
   // 播放
   songUrl: (song, opts) => ipcRenderer.invoke('migu:songUrl', song, opts),
+  canListen: (ids) => ipcRenderer.invoke('migu:canListen', ids),
   lyric: (url) => ipcRenderer.invoke('migu:lyric', url),
 
   // 我的歌单 / 收藏
