@@ -1016,14 +1016,18 @@ function bindUi() {
   document.querySelectorAll('.nav-item').forEach((n) =>
     n.addEventListener('click', () => {
       const v = n.dataset.view;
+      let kw = '';
+      if (v === 'search') {
+        kw = $('#searchInput').value.trim();
+        if (!kw) return toast('请先在顶部输入关键词');
+      }
+      // 换页面前先收起歌词抽屉：它是独立于视图的浮层，
+      // 不关的话会一直盖在新页面上（点「发现音乐」还满屏是歌词）
+      setLyricPanel(false);
       if (v === 'home') renderHome();
       else if (v === 'ranks') renderRanks();
       else if (v === 'mymusic') renderMyMusic();
-      else if (v === 'search') {
-        const kw = $('#searchInput').value.trim();
-        if (kw) renderSearch(kw);
-        else toast('请先在顶部输入关键词');
-      }
+      else if (v === 'search') renderSearch(kw);
     })
   );
 

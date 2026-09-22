@@ -10,6 +10,7 @@
     "smoke": "electron . --smoke",
     "tray-test": "electron . --tray-test",
     "test:lyric": "electron test-lyric.js",
+    "test:lyric-nav": "electron test-lyric-nav.js",
     "test:single": "powershell -ExecutionPolicy Bypass -File test-single-instance.ps1",
     "test:log": "electron test-log.js",
     "test:log-clean": "electron test-log-clean.js",
