@@ -1056,12 +1056,8 @@ function bindUi() {
   $('#modeBtn').addEventListener('click', () => {
     const order = ['list', 'single', 'random'];
     state.mode = order[(order.indexOf(state.mode) + 1) % order.length];
-    const label = { list: '列表循环', single: '单曲循环', random: '随机播放' }[state.mode];
-    toast('播放模式：' + label);
-    $('#modeIcon').innerHTML =
-      state.mode === 'single'
-        ? '<path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/><text x="12" y="15" font-size="9" text-anchor="middle" fill="currentColor">1</text>'
-        : '<path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/>';
+    syncModeIcon();
+    toast('播放模式：' + MODE_LABELS[state.mode]);
   });
 
   // 歌词抽屉
@@ -1264,6 +1260,36 @@ function bindUi() {
       $('#playBtn').click();
     }
   });
+}
+
+/* ------------------------------------------------------ 播放模式图标 */
+
+const MODE_LABELS = { list: '列表循环', single: '单曲循环', random: '随机播放' };
+
+/**
+ * 三种播放模式各自的图标。
+ * 之前 list 和 random 共用一个「环绕箭头」，光看图标分不出是在随机还是在列表循环，
+ * 所以随机播放换成标准的**交叉箭头**（shuffle）。
+ */
+const MODE_ICONS = {
+  // 环绕箭头
+  list: '<path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/>',
+  // 环绕箭头 + 1
+  single:
+    '<path d="M7 7h10v3l4-4-4-4v3H5v6h2zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2z"/>' +
+    '<text x="12" y="15" font-size="9" text-anchor="middle" fill="currentColor">1</text>',
+  // 两条交叉的箭头
+  random:
+    '<path d="M10.59 9.17 5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5z' +
+    'm.33 9.41-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>',
+};
+
+/** 按当前模式刷新按钮图标与提示 */
+function syncModeIcon() {
+  const icon = $('#modeIcon');
+  if (icon) icon.innerHTML = MODE_ICONS[state.mode] || MODE_ICONS.list;
+  const btn = $('#modeBtn');
+  if (btn) btn.title = '播放模式：' + (MODE_LABELS[state.mode] || MODE_LABELS.list);
 }
 
 /* --------------------------------------------------------- 通用确认弹窗 */
@@ -1860,6 +1886,7 @@ window.migu.onAuthChanged((auth) => {
 
 async function boot() {
   bindUi();
+  syncModeIcon(); // 让图标/提示与默认模式一致
   try {
     const auth = await window.migu.authStatus();
     renderAuth(auth);
