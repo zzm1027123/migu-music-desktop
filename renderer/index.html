@@ -5,6 +5,8 @@
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'self'; img-src 'self' https: data:; media-src 'self' https: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
   <title>咪咕音乐</title>
+  <!-- 放在样式表之前：先定好主题，避免启动瞬间闪一下深色 -->
+  <script src="theme-boot.js"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -162,6 +164,17 @@
             <input type="checkbox" id="setTray" />
             <span class="slider"></span>
           </label>
+        </div>
+
+        <div class="set-row">
+          <div class="set-label">
+            <b>界面主题</b>
+            <span>浅色模式在白天或亮环境下更舒服，立即生效并记住选择</span>
+          </div>
+          <select id="setTheme" class="select">
+            <option value="dark">深色</option>
+            <option value="light">浅色</option>
+          </select>
         </div>
 
         <div class="set-row">

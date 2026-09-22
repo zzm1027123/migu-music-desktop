@@ -11,6 +11,118 @@
   --brand-2: #ff6b81;
   --hover: #222740;
   --radius: 10px;
+
+  /* ============ 主题变量 ============
+     默认值就是原来写死在样式里的颜色，所以深色模式看上去和以前完全一样；
+     浅色主题在下面 [data-theme="light"] 里整体覆盖。 */
+  --bg-topbar: linear-gradient(180deg, #171a2b, #12141f);
+  --bg-player: linear-gradient(180deg, #161a2a, #10121c);
+  --bg-modal: linear-gradient(180deg, #1a1e30, #141726);
+  --bg-lyric: linear-gradient(180deg, #14172a, #0f1220);
+  --bg-cover: linear-gradient(135deg, #262b40, #1a1e2e);
+  --bg-cover-2: linear-gradient(135deg, #2b3150, #1c2033);
+  --bg-cover-fav: linear-gradient(135deg, #332039, #1e1b2e);
+  --bg-avatar: linear-gradient(135deg, #3a4166, #262b40);
+  --bg-thumb: #232840;
+  --bg-popup: rgba(23, 27, 45, .98);
+  --bg-toast: rgba(30, 34, 54, .97);
+  --bg-actions: rgba(8, 10, 18, .66);
+  --bg-input: #1b2036;
+
+  --track: #2c3250;
+  --track-2: #3a4166;
+  --switch-off: #333a58;
+  --line-soft: rgba(38, 43, 64, .55);
+  --line-soft-2: rgba(38, 43, 64, .6);
+  --knob: #fff;
+
+  --icon: #d8dcea;
+  --icon-2: #cfd6e8;
+  --text-4: #545c74;
+  --tag-lock: #8b93a8;
+  --tag-lock-border: rgba(139, 147, 168, .5);
+  --tag-lock-2: #9aa3bd;
+  --tag-lock-2-border: rgba(154, 163, 189, .65);
+
+  --mask: rgba(6, 8, 14, .62);
+  --focus-bg: rgba(255, 255, 255, .12);
+  --c-del-bg: rgba(16, 19, 31, .84);
+  --c-del-border: rgba(255, 255, 255, .16);
+  --player-cover-border: #10121c;
+
+  --nav-active: #fff;
+  --lyric-hl: #fff;
+
+  --shadow-1: 0 5px 18px rgba(0, 0, 0, .35);
+  --shadow-2: 0 3px 12px rgba(0, 0, 0, .4);
+  --shadow-3: 0 8px 24px rgba(0, 0, 0, .45);
+  --shadow-4: 0 20px 44px rgba(0, 0, 0, .55);
+  --shadow-5: 0 18px 48px rgba(0, 0, 0, .55);
+  --shadow-6: 0 24px 60px rgba(0, 0, 0, .55);
+  --shadow-7: 0 1px 4px rgba(0, 0, 0, .4);
+  --shadow-8: 0 1px 4px rgba(0, 0, 0, .5);
+}
+
+
+/* ================= 浅色主题 =================
+   <html data-theme="light"> 时生效。品牌色（红）两套主题共用，
+   只换掉底色、文字、描边、阴影这些结构性颜色。 */
+[data-theme="light"] {
+  --bg: #f4f5f9;
+  --bg-2: #ffffff;
+  --bg-3: #e9ecf5;
+  --line: #dde1ec;
+  --text: #1b1f2e;
+  --text-2: #575f78;
+  --text-3: #8b93a8;
+  --hover: #e7eaf3;
+
+  --bg-topbar: linear-gradient(180deg, #ffffff, #f6f7fb);
+  --bg-player: linear-gradient(180deg, #ffffff, #f3f5fa);
+  --bg-modal: linear-gradient(180deg, #ffffff, #f7f8fc);
+  --bg-lyric: linear-gradient(180deg, #ffffff, #f2f4fa);
+  --bg-cover: linear-gradient(135deg, #e6e9f2, #d9deeb);
+  --bg-cover-2: linear-gradient(135deg, #dfe3ef, #cdd4e6);
+  --bg-cover-fav: linear-gradient(135deg, #f7e4ea, #ebdfe9);
+  --bg-avatar: linear-gradient(135deg, #d6dbeb, #c3cade);
+  --bg-thumb: #e4e8f2;
+  --bg-popup: rgba(255, 255, 255, .98);
+  --bg-toast: rgba(38, 44, 66, .96);
+  --bg-actions: rgba(255, 255, 255, .78);
+  --bg-input: #f2f4fa;
+
+  --track: #d7dcea;
+  --track-2: #c2c9dd;
+  --switch-off: #c9cfe0;
+  --line-soft: rgba(20, 26, 48, .08);
+  --line-soft-2: rgba(20, 26, 48, .1);
+  --knob: #ffffff;
+
+  --icon: #4c5470;
+  --icon-2: #4c5470;
+  --text-4: #a2a9be;
+  --tag-lock: #7c8499;
+  --tag-lock-border: rgba(124, 132, 153, .45);
+  --tag-lock-2: #6b7386;
+  --tag-lock-2-border: rgba(107, 115, 134, .5);
+
+  --mask: rgba(28, 34, 56, .38);
+  --focus-bg: rgba(20, 26, 48, .06);
+  --c-del-bg: rgba(255, 255, 255, .92);
+  --c-del-border: rgba(20, 26, 48, .14);
+  --player-cover-border: #ffffff;
+
+  --nav-active: var(--brand);
+  --lyric-hl: #1b1f2e;
+
+  --shadow-1: 0 5px 18px rgba(24, 30, 55, .10);
+  --shadow-2: 0 3px 12px rgba(24, 30, 55, .12);
+  --shadow-3: 0 8px 24px rgba(24, 30, 55, .16);
+  --shadow-4: 0 20px 44px rgba(24, 30, 55, .18);
+  --shadow-5: 0 18px 48px rgba(24, 30, 55, .18);
+  --shadow-6: 0 24px 60px rgba(24, 30, 55, .20);
+  --shadow-7: 0 1px 4px rgba(24, 30, 55, .18);
+  --shadow-8: 0 1px 4px rgba(24, 30, 55, .22);
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -25,8 +137,8 @@ html, body {
 }
 
 ::-webkit-scrollbar { width: 9px; height: 9px; }
-::-webkit-scrollbar-thumb { background: #2c3250; border-radius: 6px; }
-::-webkit-scrollbar-thumb:hover { background: #3a4166; }
+::-webkit-scrollbar-thumb { background: var(--track); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--track-2); }
 ::-webkit-scrollbar-track { background: transparent; }
 
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
@@ -40,7 +152,7 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   align-items: center;
   gap: 20px;
   padding: 0 18px;
-  background: linear-gradient(180deg, #171a2b, #12141f);
+  background: var(--bg-topbar);
   border-bottom: 1px solid var(--line);
   -webkit-app-region: drag;
 }
@@ -95,7 +207,7 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 }
 .searchbox.has-text .clear-btn { opacity: 1; pointer-events: auto; }
 .searchbox .clear-btn:hover {
-  color: var(--text); background: rgba(255, 255, 255, .12); filter: none;
+  color: var(--text); background: var(--focus-bg); filter: none;
 }
 .searchbox .clear-btn svg { width: 12px; height: 12px; fill: currentColor; }
 
@@ -104,10 +216,10 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   position: absolute; top: calc(100% + 7px); left: 0; right: 0;
   z-index: 70;
   max-height: 384px; overflow-y: auto;
-  background: rgba(23, 27, 45, .98);
+  background: var(--bg-popup);
   border: 1px solid var(--line);
   border-radius: 13px;
-  box-shadow: 0 20px 44px rgba(0, 0, 0, .55);
+  box-shadow: var(--shadow-4);
   backdrop-filter: blur(14px);
   padding: 6px 0;
   opacity: 0; transform: translateY(-6px); pointer-events: none;
@@ -147,7 +259,7 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 .user-chip { display: flex; align-items: center; gap: 9px; }
 .user-chip .avatar {
   width: 32px; height: 32px; border-radius: 50%; object-fit: cover;
-  background: linear-gradient(135deg, #3a4166, #262b40);
+  background: var(--bg-avatar);
   display: grid; place-items: center; font-size: 13px; color: #fff;
 }
 .user-chip .name { font-size: 13px; max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -175,7 +287,7 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 }
 .nav-item .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; opacity: .5; }
 .nav-item:hover { background: var(--hover); color: var(--text); }
-.nav-item.active { background: linear-gradient(90deg, rgba(255,45,85,.18), rgba(255,45,85,.04)); color: #fff; font-weight: 600; }
+.nav-item.active { background: linear-gradient(90deg, rgba(255,45,85,.18), rgba(255,45,85,.04)); color: var(--nav-active); font-weight: 600; }
 .nav-item.active .dot { background: var(--brand); opacity: 1; }
 
 .side-block { margin-bottom: 18px; }
@@ -228,9 +340,9 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 .card:hover { transform: translateY(-3px); }
 .card .c-cover {
   width: 100%; aspect-ratio: 1; border-radius: 10px; overflow: hidden;
-  background: linear-gradient(135deg, #262b40, #1a1e2e);
+  background: var(--bg-cover);
   position: relative; margin-bottom: 8px;
-  box-shadow: 0 5px 18px rgba(0,0,0,.35);
+  box-shadow: var(--shadow-1);
 }
 .card .c-cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .card .c-cover .c-play {
@@ -248,9 +360,9 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 .card .c-cover .c-del {
   position: absolute; right: 8px; top: 8px;
   width: 26px; height: 26px; padding: 0; border-radius: 50%;
-  background: rgba(16,19,31,.84); color: #cfd6e8; cursor: pointer;
+  background: var(--c-del-bg); color: var(--icon-2); cursor: pointer;
   display: grid; place-items: center;
-  border: 1px solid rgba(255,255,255,.16);
+  border: 1px solid var(--c-del-border);
   opacity: 0; transform: translateY(-6px); transition: all .18s;
 }
 .card .c-cover:hover .c-del { opacity: 1; transform: none; }
@@ -274,7 +386,7 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 .song-row.playing .s-name { color: var(--brand); }
 .s-idx { font-size: 12.5px; color: var(--text-3); text-align: center; }
 .s-idx .eq { color: var(--brand); font-size: 13px; }
-.s-cover { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #232840; }
+.s-cover { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: var(--bg-thumb); }
 .s-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
 .s-artist, .s-album { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
 .s-actions { display: flex; gap: 4px; justify-content: flex-end; opacity: 0; transition: opacity .15s; }
@@ -294,7 +406,7 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   font-size: 9.5px; font-weight: 700; letter-spacing: .5px;
   border-radius: 3px; padding: 0 3px; line-height: 13px; flex: none;
 }
-.tag-lock { color: #8b93a8; border: 1px solid rgba(139,147,168,.5); }
+.tag-lock { color: var(--tag-lock); border: 1px solid var(--tag-lock-border); }
 .tag-trial { color: #4aa8ff; border: 1px solid rgba(74,168,255,.5); }
 /*
  * 不能播放的歌曲：整行转灰。
@@ -306,10 +418,10 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 .song-row.restricted .s-artist,
 .song-row.restricted .s-album { color: var(--text-3); }
 .song-row.restricted .s-idx,
-.song-row.restricted .s-dur { color: #545c74; }
+.song-row.restricted .s-dur { color: var(--text-4); }
 .song-row.restricted .s-cover { filter: grayscale(1) brightness(.72); }
 .song-row.restricted:hover { opacity: 1; }
-.song-row.restricted .tag-lock { color: #9aa3bd; border-color: rgba(154,163,189,.65); }
+.song-row.restricted .tag-lock { color: var(--tag-lock-2); border-color: var(--tag-lock-2-border); }
 
 .empty { text-align: center; color: var(--text-3); padding: 60px 0; font-size: 13.5px; }
 
@@ -319,7 +431,7 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 .loading { text-align: center; padding: 60px 0; color: var(--text-3); font-size: 13px; }
 .spinner {
   width: 26px; height: 26px; margin: 0 auto 12px;
-  border: 2.5px solid #2c3250; border-top-color: var(--brand);
+  border: 2.5px solid var(--track); border-top-color: var(--brand);
   border-radius: 50%; animation: spin .8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -338,7 +450,7 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
   height: 84px;
   display: flex; align-items: center; gap: 22px;
   padding: 0 22px;
-  background: linear-gradient(180deg, #161a2a, #10121c);
+  background: var(--bg-player);
   border-top: 1px solid var(--line);
 }
 .now { display: flex; align-items: center; gap: 12px; width: 250px; flex: none; }
@@ -348,19 +460,19 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 .cover-wrap.lyric-on::after {
   content: ''; position: absolute; top: -2px; right: -2px;
   width: 9px; height: 9px; border-radius: 50%;
-  background: var(--brand); border: 1.5px solid #10121c;
+  background: var(--brand); border: 1.5px solid var(--player-cover-border);
 }
 .cover-actions {
   position: absolute; inset: 0; border-radius: 9px;
   display: flex; align-items: center; justify-content: center; gap: 3px;
-  background: rgba(8, 10, 18, .66);
+  background: var(--bg-actions);
   opacity: 0; pointer-events: none;
   transition: opacity .16s;
 }
 .cover-wrap:hover .cover-actions { opacity: 1; pointer-events: auto; }
 .cover-actions .icon-btn.mini {
   width: 22px; height: 22px; border-radius: 6px;
-  color: #d8dcea; display: grid; place-items: center;
+  color: var(--icon); display: grid; place-items: center;
 }
 .cover-actions .icon-btn.mini svg { width: 13px; height: 13px; }
 .cover-actions .icon-btn.mini:hover { background: var(--brand); color: #fff; }
@@ -368,8 +480,8 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 
 .now-cover {
   width: 50px; height: 50px; border-radius: 9px;
-  background: linear-gradient(135deg, #2b3150, #1c2033) center/cover;
-  box-shadow: 0 3px 12px rgba(0,0,0,.4);
+  background: var(--bg-cover-2) center/cover;
+  box-shadow: var(--shadow-2);
 }
 .now-meta { overflow: hidden; }
 .now-name { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -396,11 +508,11 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 
 input[type="range"] {
   -webkit-appearance: none; appearance: none;
-  height: 4px; border-radius: 3px; background: #2c3250; outline: none; cursor: pointer;
+  height: 4px; border-radius: 3px; background: var(--track); outline: none; cursor: pointer;
 }
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%;
-  background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.5);
+  background: var(--knob); box-shadow: var(--shadow-8);
 }
 #seek { flex: 1; }
 #volume { width: 88px; }
@@ -420,7 +532,7 @@ input[type="range"]::-webkit-slider-thumb {
   display: flex;
   background:
     radial-gradient(1100px 520px at 22% 18%, rgba(255,45,85,.10), transparent 62%),
-    linear-gradient(180deg, #14172a, #0f1220);
+    var(--bg-lyric);
   border-left: 1px solid var(--line);
   opacity: 0; transform: translateY(14px); pointer-events: none;
   transition: opacity .22s ease, transform .22s ease;
@@ -432,13 +544,13 @@ input[type="range"]::-webkit-slider-thumb {
   width: 36%; min-width: 250px; max-width: 430px;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 22px; padding: 34px 30px;
-  border-right: 1px solid rgba(38, 43, 64, .55);
+  border-right: 1px solid var(--line-soft);
 }
 .lp-cover {
   width: 100%; max-width: 270px; aspect-ratio: 1 / 1;
   border-radius: 18px;
-  background: linear-gradient(135deg, #2b3150, #1c2033) center/cover;
-  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+  background: var(--bg-cover-2) center/cover;
+  box-shadow: var(--shadow-5);
   transition: background-image .3s;
 }
 .lp-meta { text-align: center; max-width: 100%; }
@@ -467,7 +579,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .lyric-body .ll:hover { opacity: .85; }
 .lyric-body .ll.on {
-  color: #fff; font-weight: 700; opacity: 1;
+  color: var(--lyric-hl); font-weight: 700; opacity: 1;
   transform: scale(1.08);
   text-shadow: 0 0 22px rgba(255, 45, 85, .55);
 }
@@ -483,7 +595,7 @@ input[type="range"]::-webkit-slider-thumb {
   color: var(--text-3); font-weight: inherit; transform: none; text-shadow: none; opacity: .5;
 }
 .lyric-body .ll.target {
-  color: #fff; font-weight: 700; opacity: 1;
+  color: var(--lyric-hl); font-weight: 700; opacity: 1;
   transform: scale(1.12);
   text-shadow: 0 0 24px rgba(255, 45, 85, .8);
 }
@@ -496,7 +608,7 @@ input[type="range"]::-webkit-slider-thumb {
   font-size: 12.5px; font-variant-numeric: tabular-nums;
   opacity: 0; pointer-events: none; z-index: 3;
   transition: opacity .15s, transform .15s;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+  box-shadow: var(--shadow-3);
   max-width: 70%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .lyric-seek-tip.show { opacity: 1; transform: translate(-50%, 0); }
@@ -510,7 +622,7 @@ input[type="range"]::-webkit-slider-thumb {
   opacity: 0; pointer-events: none;
   transition: opacity .18s, transform .18s;
   transform: translateY(6px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
+  box-shadow: var(--shadow-3);
 }
 .lyric-follow-btn.show { opacity: 1; pointer-events: auto; transform: none; }
 .lyric-follow-btn:hover { filter: brightness(1.1); }
@@ -518,7 +630,7 @@ input[type="range"]::-webkit-slider-thumb {
 /* --------------------------------------------------------------- 提示 */
 .toast {
   position: fixed; left: 50%; bottom: 108px; transform: translate(-50%, 14px);
-  background: rgba(30,34,54,.97); color: #fff;
+  background: var(--bg-toast); color: #fff;
   padding: 10px 20px; border-radius: 999px; font-size: 13px;
   border: 1px solid var(--line);
   opacity: 0; pointer-events: none; transition: all .25s; z-index: 60;
@@ -529,7 +641,7 @@ input[type="range"]::-webkit-slider-thumb {
 /* --------------------------------------------------------------- 设置面板 */
 .modal-mask {
   position: fixed; inset: 0; z-index: 80;
-  background: rgba(6, 8, 14, .62);
+  background: var(--mask);
   backdrop-filter: blur(3px);
   display: grid; place-items: center;
   opacity: 0; pointer-events: none; transition: opacity .18s;
@@ -538,10 +650,10 @@ input[type="range"]::-webkit-slider-thumb {
 
 .modal {
   width: 520px; max-width: 92vw;
-  background: linear-gradient(180deg, #1a1e30, #141726);
+  background: var(--bg-modal);
   border: 1px solid var(--line);
   border-radius: 14px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, .55);
+  box-shadow: var(--shadow-6);
   transform: translateY(10px) scale(.98);
   transition: transform .2s;
   overflow: hidden;
@@ -561,7 +673,7 @@ input[type="range"]::-webkit-slider-thumb {
 
 .set-row {
   display: flex; align-items: center; justify-content: space-between; gap: 18px;
-  padding: 15px 0; border-bottom: 1px solid rgba(38, 43, 64, .6);
+  padding: 15px 0; border-bottom: 1px solid var(--line-soft-2);
 }
 .set-row:last-of-type { border-bottom: none; }
 .set-label { display: flex; flex-direction: column; gap: 4px; }
@@ -575,12 +687,12 @@ input[type="range"]::-webkit-slider-thumb {
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 .switch .slider {
   position: absolute; inset: 0; border-radius: 999px;
-  background: #333a58; transition: background .2s;
+  background: var(--switch-off); transition: background .2s;
 }
 .switch .slider::before {
   content: ''; position: absolute; width: 19px; height: 19px; left: 3px; top: 3px;
   border-radius: 50%; background: #fff; transition: transform .2s;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, .4);
+  box-shadow: var(--shadow-7);
 }
 .switch input:checked + .slider { background: var(--brand); }
 .switch input:checked + .slider::before { transform: translateX(21px); }
@@ -618,7 +730,7 @@ input[type="range"]::-webkit-slider-thumb {
 .pl-item:hover { background: var(--hover); }
 .pl-cover {
   width: 42px; height: 42px; border-radius: 8px; flex: none;
-  background: linear-gradient(135deg, #2b3150, #1c2033) center/cover;
+  background: var(--bg-cover-2) center/cover;
   display: grid; place-items: center; font-size: 17px; color: var(--brand);
 }
 .pl-meta { min-width: 0; }
@@ -629,8 +741,8 @@ input[type="range"]::-webkit-slider-thumb {
 .new-pl-hint { font-size: 12.5px; color: var(--text-3); margin-bottom: 10px; }
 .new-pl-input {
   width: 100%; box-sizing: border-box;
-  background: var(--panel-2, #1b2036); color: inherit;
-  border: 1px solid var(--line, #2c3250); border-radius: 8px;
+  background: var(--bg-input); color: inherit;
+  border: 1px solid var(--line); border-radius: 8px;
   padding: 9px 11px; font-size: 13.5px; outline: none;
 }
 .new-pl-input:focus { border-color: var(--brand); }
@@ -638,7 +750,7 @@ input[type="range"]::-webkit-slider-thumb {
 /* .btn-ghost 默认是 flex:1（给设置面板两个按钮平分用的），这里要恢复自然宽度 */
 .new-pl-actions .btn-ghost { flex: none; padding: 0 18px; border-radius: 999px; }
 /* 「我的歌单」区里那张虚线的新建卡片 */
-.pl-card.pl-new { border: 1px dashed var(--line, #2c3250); background: transparent; }
+.pl-card.pl-new { border: 1px dashed var(--line); background: transparent; }
 .pl-card.pl-new:hover { border-color: var(--brand); }
 .pl-card.pl-new .pl-cover-fav { background: transparent; color: var(--text-3); font-size: 30px; }
 .pl-card.pl-new:hover .pl-cover-fav { color: var(--brand); }
@@ -670,7 +782,7 @@ input[type="range"]::-webkit-slider-thumb {
 }
 .mymusic-avatar {
   width: 62px; height: 62px; border-radius: 50%; flex: none;
-  background: linear-gradient(135deg, #3a4166, #262b40) center/cover;
+  background: var(--bg-avatar) center/cover;
   display: grid; place-items: center; font-size: 24px; color: #fff;
 }
 .mymusic-info b { font-size: 17px; display: block; }
@@ -682,7 +794,7 @@ input[type="range"]::-webkit-slider-thumb {
 .pl-card .pl-cover-fav {
   width: 100%; height: 100%; display: grid; place-items: center;
   font-size: 42px; color: var(--brand);
-  background: linear-gradient(135deg, #332039, #1e1b2e);
+  background: var(--bg-cover-fav);
 }
 .pl-card .c-cover .c-play { background: rgba(255, 45, 85, .95); }
 .pl-card .c-cover .c-play svg { width: 18px; height: 18px; }

@@ -8,6 +8,7 @@ const DEFAULTS = {
   minimizeToTray: true, // 关闭主窗口时最小化到系统托盘，而不是退出
   showTrayTip: true, // 首次最小化时弹一次气泡提示
   trayTipShown: false,
+  theme: 'dark', // 界面主题：dark / light
   tone: 'PQ', // 默认音质
   volume: 70, // 默认音量
   lyricLocked: false, // 桌面歌词是否锁定（锁定后鼠标穿透）

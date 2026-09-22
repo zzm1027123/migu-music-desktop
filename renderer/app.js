@@ -1114,6 +1114,12 @@ function bindUi() {
     await window.migu.settings.set({ minimizeToTray: e.target.checked });
     toast(e.target.checked ? '关闭窗口时将最小化到系统托盘' : '关闭窗口时将直接退出程序');
   });
+  $('#setTheme').addEventListener('change', async (e) => {
+    const t = e.target.value === 'light' ? 'light' : 'dark';
+    applyTheme(t);
+    await window.migu.settings.set({ theme: t });
+    toast(t === 'light' ? '已切换到浅色模式' : '已切换到深色模式');
+  });
   $('#setTone').addEventListener('change', async (e) => {
     state.tone = e.target.value;
     $('#toneSel').value = e.target.value;
@@ -1765,10 +1771,27 @@ async function refreshLogStats() {
   }
 }
 
+/**
+ * 应用界面主题。
+ * 深色是默认值（写在 :root 里），所以只在浅色时挂 data-theme="light"。
+ */
+function applyTheme(theme) {
+  const t = theme === 'light' ? 'light' : 'dark';
+  if (t === 'light') document.documentElement.dataset.theme = 'light';
+  else delete document.documentElement.dataset.theme;
+  try {
+    // 存一份给 theme-boot.js：下次启动能在样式表之前就把主题定下来，不会闪
+    localStorage.setItem('migu-theme', t);
+  } catch {}
+  const sel = $('#setTheme');
+  if (sel) sel.value = t;
+}
+
 async function openSettings() {
   try {
     const s = await window.migu.settings.get();
     $('#setTray').checked = !!s.minimizeToTray;
+    applyTheme(s.theme);
     $('#setTone').value = s.tone || 'PQ';
     $('#setVolume').value = String(typeof s.volume === 'number' ? s.volume : 70);
     $('#logRetention').value = String(typeof s.logRetentionDays === 'number' ? s.logRetentionDays : 30);
@@ -1842,9 +1865,10 @@ async function boot() {
     renderAuth(auth);
   } catch {}
 
-  // 应用上次保存的设置（音质 / 音量）
+  // 应用上次保存的设置（主题 / 音质 / 音量）
   try {
     const s = await window.migu.settings.get();
+    applyTheme(s.theme); // 以主进程设置为准，覆盖 theme-boot.js 的预判
     if (s.tone) {
       state.tone = s.tone;
       $('#toneSel').value = s.tone;
@@ -1867,6 +1891,7 @@ async function boot() {
   // 在托盘菜单里改设置时，界面同步过来
   window.migu.onSettingsChanged((s) => {
     $('#setTray').checked = !!s.minimizeToTray;
+    applyTheme(s.theme);
     if (s.tone) {
       state.tone = s.tone;
       $('#toneSel').value = s.tone;
