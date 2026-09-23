@@ -712,6 +712,56 @@ const ipcContext = {
   lyricSaveFont: (f) => settings.set({ lyricFontCur: f && f.cur, lyricFontNext: f && f.next }),
 };
 
+/* ---------------------------------------------------- 登录状态保活 */
+
+/**
+ * 给服务端发一次用户态请求，请它把登录票据续期。
+ *
+ * 咪咕的 pacmtoken 只有 2 小时有效期，靠客户端请求来续期。客户端挂在托盘里不动时
+ * 一个请求都不会发，于是关掉再打开就过期了 —— 实测：09:21 关客户端，pacmtoken
+ * 11:21 过期并被浏览器删掉，12:09 再启动时请求里已经没有它，服务端一律回「请先登录」。
+ *
+ * 所以这里定时打个招呼；成功后顺手把浏览器侧的有效期也延一延。
+ */
+const KEEPALIVE_INTERVAL_MS = 20 * 60 * 1000;
+let keepAliveTimer = null;
+let keepAliveKickoff = null;
+
+async function keepAliveOnce(reason) {
+  if (!authState.loggedIn) return;
+  try {
+    const r = await resolver.webCall('/pc/user/home-page/v2.0');
+    if (r && r.res && r.res.code === '000000') {
+      const hard = await persistLoginTickets(session.defaultSession, 30, { force: true });
+      if (hard.extended) logger.info(`[登录] 保活成功（${reason}），票据有效期已延长 ${hard.extended} 个`);
+    } else {
+      logger.warn(`[登录] 保活请求未通过（${reason}）：` + ((r && r.res && r.res.info) || r.err || '未知原因'));
+    }
+  } catch (e) {
+    logger.warn(`[登录] 保活异常（${reason}）：` + ((e && e.message) || e));
+  }
+}
+
+function startSessionKeepAlive() {
+  stopSessionKeepAlive();
+  keepAliveTimer = setInterval(() => keepAliveOnce('定时'), KEEPALIVE_INTERVAL_MS);
+  if (keepAliveTimer.unref) keepAliveTimer.unref();
+  // 启动后不久先打一次招呼，别等到 20 分钟后
+  keepAliveKickoff = setTimeout(() => keepAliveOnce('启动'), 20000);
+  if (keepAliveKickoff.unref) keepAliveKickoff.unref();
+}
+
+function stopSessionKeepAlive() {
+  if (keepAliveTimer) {
+    clearInterval(keepAliveTimer);
+    keepAliveTimer = null;
+  }
+  if (keepAliveKickoff) {
+    clearTimeout(keepAliveKickoff);
+    keepAliveKickoff = null;
+  }
+}
+
 /* --------------------------------------------------------------- 启动 */
 
 app.whenReady().then(() => {
@@ -723,6 +773,21 @@ app.whenReady().then(() => {
     notifyLyricChanged();
   });
   checkAuth();
+  startSessionKeepAlive();
+  // 启动时记一笔票据清单：以后排查「登录态为什么没了」，
+  // 一眼就能看出关键票据（尤其 pacmtoken）在不在、还剩多久
+  setTimeout(async () => {
+    try {
+      const cookies = await session.defaultSession.cookies.get({});
+      const list = cookies
+        .filter((c) => LOGIN_TICKET_NAMES.includes(c.name))
+        .map((c) => {
+          const left = c.expirationDate ? Math.round((c.expirationDate * 1000 - Date.now()) / 3600000) + 'h' : '会话级';
+          return `${c.name}=${left}`;
+        });
+      logger.info(`[登录] 启动时票据清单：${list.length ? list.join(' ') : '（一个都没有，需要重新登录）'}`);
+    } catch {}
+  }, 900);
   // 后台预热解析器（隐藏窗口加载咪咕网页版，复用其官方 SDK 解密播放地址）
   setTimeout(() => resolver.prewarm(), 1500);
   if (process.argv.includes('--smoke')) runSmokeTest();
@@ -733,9 +798,22 @@ app.whenReady().then(() => {
   });
 });
 
-// 真正退出前放行 close 拦截
-app.on('before-quit', () => {
+// 真正退出前放行 close 拦截；顺便把登录票据的有效期再延一次，
+// 否则服务端最后一次下发的 pacmtoken 只有 2 小时，下次启动浏览器已经不带了
+let quitHardened = false;
+app.on('before-quit', (e) => {
   isQuitting = true;
+  if (quitHardened) return;
+  quitHardened = true;
+  e.preventDefault();
+  stopSessionKeepAlive();
+  // 最多等 1.5 秒，别让加固把退出卡住
+  Promise.race([
+    persistLoginTickets(session.defaultSession, 30, { force: true }),
+    new Promise((r) => setTimeout(r, 1500)),
+  ])
+    .catch(() => {})
+    .finally(() => app.quit());
 });
 
 /** 冒烟测试：以真实入口启动，截图并退出（npm run smoke） */
