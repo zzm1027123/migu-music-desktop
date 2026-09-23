@@ -1555,16 +1555,35 @@ async function deletePlaylistFlow(id, title) {
   }
 }
 
-async function renderMyMusic() {
+async function renderMyMusic(retry = 0) {
   state.view = 'mymusic';
   setNav('mymusic');
-  view.innerHTML = loadingHtml('正在读取你的歌单…');
+  view.innerHTML = loadingHtml(retry ? '正在同步你的歌单…' : '正在读取你的歌单…');
   try {
     const [auth, r] = await Promise.all([window.migu.authStatus(), window.migu.myPlaylists()]);
 
     if (!r || !r.ok) {
       // 登录态失效时，服务端只会回一句「参数校验失败」，直接显示等于没说
       const needLogin = (r && r.needLogin) || !(auth && auth.loggedIn);
+
+      /*
+       * 刚登录完的一两分钟里，服务端会话可能还没真正生效：
+       * 界面这边一收到「登录成功」就去拉歌单，会扑空并被告知「登录已失效」，
+       * 而实际上过十几秒它自己就好了（日志里见过 14 秒）。
+       * 这种情况别急着报错，等一下自动重试；重试期间告诉用户在同步。
+       */
+      const since = (auth && auth.since) || 0;
+      const justLoggedIn = since > 0 && Date.now() - since < 120000;
+      if (needLogin && auth && auth.loggedIn && justLoggedIn && retry < 3) {
+        view.innerHTML =
+          `<div class="page-title">我的音乐</div>` +
+          loadingHtml(`登录刚完成，正在同步你的歌单…（第 ${retry + 1} 次）`);
+        setTimeout(() => {
+          if (state.view === 'mymusic') renderMyMusic(retry + 1);
+        }, 2000);
+        return;
+      }
+
       view.innerHTML =
         `<div class="page-title">我的音乐</div>` +
         emptyHtml(
@@ -1694,7 +1713,7 @@ async function addQueueToPlaylist(musicListId, title) {
 
 let plTargetSong = null;
 
-async function openPlaylistPicker(song) {
+async function openPlaylistPicker(song, retry = 0) {
   if (!song || !song.contentId) return toast('这首歌没有可用的 contentId，无法添加');
   plTargetSong = song;
   $('#plSong').textContent = song.name + ' — ' + ((song.artists || []).join('、') || '未知歌手');
@@ -1705,6 +1724,21 @@ async function openPlaylistPicker(song) {
   try {
     const r = await window.migu.myPlaylists();
     if (!r || !r.ok) {
+      // 和「我的音乐」页同理：刚登录完服务端会话可能还没生效，等一下自动重试
+      if (r && r.needLogin && retry < 2) {
+        let justLoggedIn = false;
+        try {
+          const a = await window.migu.authStatus();
+          justLoggedIn = !!(a && a.loggedIn && a.since && Date.now() - a.since < 120000);
+        } catch {}
+        if (justLoggedIn) {
+          box.innerHTML = '<div class="suggest-empty">登录刚完成，正在同步你的歌单…</div>';
+          setTimeout(() => {
+            if ($('#playlistMask').classList.contains('show')) openPlaylistPicker(song, retry + 1);
+          }, 2000);
+          return;
+        }
+      }
       box.innerHTML = `<div class="suggest-empty">${esc(
         (r && r.needLogin)
           ? '登录状态已失效，请先重新登录再收藏歌曲'
