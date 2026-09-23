@@ -26,7 +26,15 @@ logger.init(USER_DATA);
 
 // 设置也要在日志清理之前就绪（保留天数从这里读）
 const settings = require('./src/settings');
-const { LOGIN_TICKET_NAMES, persistLoginTickets } = require('./src/login-tickets');
+const {
+  LOGIN_TICKET_NAMES,
+  persistLoginTickets,
+  backupPacToken,
+  readPacTokenBackup,
+  clearPacTokenBackup,
+  getPacTokenCookie,
+  setPacTokenCookie,
+} = require('./src/login-tickets');
 settings.init(USER_DATA);
 initLoginDir();
 
@@ -522,7 +530,8 @@ async function finishLogin(reason) {
   authState.cookies = cookies;
   authState.cookieKeys = added.map((c) => c.name + '@' + c.domain);
   // 会话级票据在进程退出时会被 Chromium 丢掉，先加固成持久 Cookie 再落盘
-  await persistLoginTickets(session.defaultSession).catch(() => {});
+  await persistLoginTickets(session.defaultSession, 30, { force: true }).catch(() => {});
+  await backupPacTokenNow();
   saveAuthFile();
   stopLoginWatch();
   logger.info(`[登录] 登录成功（${reason}）昵称=${authState.nickname || '(未获取)'} 新增Cookie=${added.length}个`);
@@ -712,6 +721,42 @@ const ipcContext = {
   lyricSaveFont: (f) => settings.set({ lyricFontCur: f && f.cur, lyricFontNext: f && f.next }),
 };
 
+/* ------------------------------------------------- pacmtoken 备份与还原 */
+
+/**
+ * 启动时把备份里的 pacmtoken 还原回 cookie。
+ *
+ * 必须赶在解析器加载网页版之前做完 —— 咪咕页面一加载就会把这个 cookie 清掉。
+ * 详见 src/login-tickets.js 里那段说明。
+ */
+async function restorePacTokenFromBackup() {
+  try {
+    const cur = await getPacTokenCookie(session.defaultSession);
+    if (cur) {
+      backupPacToken(LOGIN_DIR, cur); // 顺手刷新备份
+      return;
+    }
+    const bak = readPacTokenBackup(LOGIN_DIR);
+    if (!bak) return;
+    if (await setPacTokenCookie(session.defaultSession, bak)) {
+      logger.info('[登录] cookie 里的 pacmtoken 已不在，已用本地备份还原');
+    }
+  } catch (e) {
+    logger.warn('[登录] 还原 pacmtoken 失败：' + ((e && e.message) || e));
+  }
+}
+
+/** 把当前 cookie 里的 pacmtoken 存一份到本地 */
+async function backupPacTokenNow() {
+  try {
+    const cur = await getPacTokenCookie(session.defaultSession);
+    if (cur) backupPacToken(LOGIN_DIR, cur);
+    return !!cur;
+  } catch {
+    return false;
+  }
+}
+
 /* ---------------------------------------------------- 登录状态保活 */
 
 /**
@@ -733,6 +778,9 @@ async function keepAliveOnce(reason) {
     const r = await resolver.webCall('/pc/user/home-page/v2.0');
     if (r && r.res && r.res.code === '000000') {
       const hard = await persistLoginTickets(session.defaultSession, 30, { force: true });
+      // 页面里的 token 可能被清过，顺手补回 localStorage；cookie 也存一份备份
+      await resolver.syncPacToken().catch(() => {});
+      await backupPacTokenNow();
       if (hard.extended) logger.info(`[登录] 保活成功（${reason}），票据有效期已延长 ${hard.extended} 个`);
     } else {
       logger.warn(`[登录] 保活请求未通过（${reason}）：` + ((r && r.res && r.res.info) || r.err || '未知原因'));
@@ -764,8 +812,9 @@ function stopSessionKeepAlive() {
 
 /* --------------------------------------------------------------- 启动 */
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (alreadyRunning) return; // 已有实例在跑，本次启动就此结束
+  await restorePacTokenFromBackup(); // 必须早于解析器加载页面
   registerIpc(ipcContext);
   createMainWindow();
   createTray();
@@ -809,7 +858,11 @@ app.on('before-quit', (e) => {
   stopSessionKeepAlive();
   // 最多等 1.5 秒，别让加固把退出卡住
   Promise.race([
-    persistLoginTickets(session.defaultSession, 30, { force: true }),
+    (async () => {
+      await backupPacTokenNow();
+      await persistLoginTickets(session.defaultSession, 30, { force: true });
+      await backupPacTokenNow(); // 加固后可能还有新值，再存一次
+    })(),
     new Promise((r) => setTimeout(r, 1500)),
   ])
     .catch(() => {})

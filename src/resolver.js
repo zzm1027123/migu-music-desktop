@@ -12,7 +12,7 @@
  *      因此会员账号的权益能正常生效；
  *   3. 动态发现 SDK chunk 名，官方改版换 hash 也不会失效。
  */
-const { BrowserWindow } = require('electron');
+const { BrowserWindow, session } = require('electron');
 const logger = require('./logger');
 
 const PAGE_URL = 'https://music.migu.cn/v5/';
@@ -29,6 +29,74 @@ let win = null;
 let booting = null;
 let ready = false;
 let lastError = '';
+
+/**
+ * 把 cookie 里的 pacmtoken 补进页面的 localStorage。
+ *
+ * 这是登录态"看起来还在、实际用不了"的真正原因：
+ * 咪咕网页版的 SDK 把登录 token 放在 **localStorage 的 `mg_auth_pacmtoken`**，
+ * HTTP 客户端的默认请求头里有 `pacmtoken` 字段，值就从那里读 —— 它**不看 cookie**。
+ * 而登录态失效、或页面重新初始化时这个键会丢，于是请求等于没带 token，
+ * 服务端一律回「请先登录」（注意不是"token 无效"，是压根没带）。
+ *
+ * 我们已经在票据加固那一层保住了 cookie 里的 pacmtoken，这里把它同步回
+ * localStorage；值变了就重载一次页面，让 SDK 用新 token 重新初始化。
+ *
+ * @returns {Promise<'same'|'set'|'none'|'error'>}
+ */
+async function restorePacToken(w) {
+  try {
+    const cookies = await session.defaultSession.cookies.get({ name: 'pacmtoken' });
+    const c = (cookies || []).find((x) => x.value && x.value.length > 12);
+    if (!c) return 'none';
+
+    const js = `(() => {
+      try {
+        const cur = localStorage.getItem('mg_auth_pacmtoken');
+        if (cur === ${JSON.stringify(c.value)}) return 'same';
+        localStorage.setItem('mg_auth_pacmtoken', ${JSON.stringify(c.value)});
+        return 'set';
+      } catch (e) { return 'error'; }
+    })()`;
+    const r = await w.webContents.executeJavaScript(js, true);
+    if (r === 'set') {
+      logger.info('[解析器] 已把 cookie 里的 pacmtoken 补回页面 localStorage，重载页面让 SDK 重新初始化');
+      const done = new Promise((resolve) => {
+        w.webContents.once('did-finish-load', resolve);
+        setTimeout(resolve, 8000);
+      });
+      w.webContents.reload();
+      await done;
+    }
+    return r;
+  } catch (e) {
+    logger.warn('[解析器] 同步 pacmtoken 失败：' + ((e && e.message) || e));
+    return 'error';
+  }
+}
+
+/** 对外的便捷入口：窗口还活着就把 pacmtoken 同步一次 */
+async function syncPacToken() {
+  if (!alive()) return 'none';
+  return restorePacToken(win);
+}
+
+/** 诊断用：页面里 pacmtoken 的现状 */
+async function pacTokenState() {
+  if (!alive()) return null;
+  try {
+    const cookies = await session.defaultSession.cookies.get({ name: 'pacmtoken' });
+    const cookieVal = ((cookies || [])[0] || {}).value || '';
+    const js = `JSON.stringify({
+      storedLen: (localStorage.getItem('mg_auth_pacmtoken') || '').length,
+      cookieLen: ${JSON.stringify(cookieVal.length)},
+      same: localStorage.getItem('mg_auth_pacmtoken') === ${JSON.stringify(cookieVal)}
+    })`;
+    return JSON.parse(await win.webContents.executeJavaScript(js, true));
+  } catch {
+    return null;
+  }
+}
 
 /** 在页面里定位并加载 migusdk，返回其 http 客户端可用性 */
 const SDK_PROBE = `(async () => {
@@ -79,6 +147,7 @@ async function boot() {
       });
       win = w;
       await w.loadURL(PAGE_URL);
+      await restorePacToken(w);
     }
 
     // 页面刚加载时 SDK 可能还没在 performance 里登记，重试几次
@@ -250,4 +319,14 @@ function destroy() {
   booting = null;
 }
 
-module.exports = { resolvePlayUrl, canListen, webCall, prewarm, status, destroy };
+module.exports = {
+  resolvePlayUrl,
+  canListen,
+  webCall,
+  prewarm,
+  status,
+  destroy,
+  restorePacToken,
+  syncPacToken,
+  pacTokenState,
+};

@@ -22,6 +22,8 @@
  *
  * 单独成模块是为了能脱离 main.js 直接单测（见 test-ticket-persist.js）。
  */
+const fs = require('fs');
+const path = require('path');
 const logger = require('./logger');
 
 /** 咪咕的登录票据 Cookie 名 */
@@ -32,6 +34,73 @@ const TICKET_DOMAINS = ['.migu.cn', 'music.migu.cn', 'passport.migu.cn'];
 
 /** 两次加固之间的最小间隔，防止频繁重写认证 Cookie */
 const MIN_INTERVAL_MS = 60 * 1000;
+
+/** pacmtoken 的本地备份文件名（放在 userData/login 下） */
+const PAC_BACKUP_FILE = 'pacmtoken.bak';
+
+/* ------------------------------------------------ pacmtoken 的备份与还原
+ *
+ * 实测：咪咕页面一加载就会把 cookie 里的 pacmtoken 清掉（它拿 token 去服务端校验，
+ * 没通过就清）。而页面 SDK 又是从 cookie / localStorage 读这个 token 的。
+ * 所以必须在自己的目录里留一份备份，启动时先还原回 cookie，解析器才读得到。
+ */
+
+function backupPacToken(dir, value) {
+  try {
+    if (!value || String(value).length < 12) return false;
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, PAC_BACKUP_FILE), String(value), 'utf8');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readPacTokenBackup(dir) {
+  try {
+    const v = fs.readFileSync(path.join(dir, PAC_BACKUP_FILE), 'utf8').trim();
+    return v.length > 12 ? v : '';
+  } catch {
+    return '';
+  }
+}
+
+function clearPacTokenBackup(dir) {
+  try {
+    fs.unlinkSync(path.join(dir, PAC_BACKUP_FILE));
+  } catch {}
+}
+
+/** 读 cookie 里的 pacmtoken（没有就返回空串） */
+async function getPacTokenCookie(sess) {
+  try {
+    const list = await sess.cookies.get({ name: 'pacmtoken' });
+    const c = (list || []).find((x) => (x.value || '').length > 12);
+    return c ? c.value : '';
+  } catch {
+    return '';
+  }
+}
+
+/** 把 pacmtoken 写回 cookie（带 30 天有效期，免得又被会话级规则丢掉） */
+async function setPacTokenCookie(sess, value) {
+  if (!value || String(value).length < 12) return false;
+  try {
+    await sess.cookies.set({
+      url: 'https://music.migu.cn/',
+      name: 'pacmtoken',
+      value: String(value),
+      domain: '.migu.cn',
+      path: '/',
+      secure: true,
+      httpOnly: true,
+      expirationDate: Math.floor(Date.now() / 1000) + 30 * 86400,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** 完整 Cookie 记录（带 value / 过期时间 / secure 等），用于加固 */
 async function fullCookies(sess) {
@@ -119,4 +188,14 @@ async function persistLoginTickets(sess, days = 30, opts = {}) {
   return { total: tickets.length, extended, skipped, failed };
 }
 
-module.exports = { LOGIN_TICKET_NAMES, TICKET_DOMAINS, fullCookies, persistLoginTickets };
+module.exports = {
+  LOGIN_TICKET_NAMES,
+  TICKET_DOMAINS,
+  fullCookies,
+  persistLoginTickets,
+  backupPacToken,
+  readPacTokenBackup,
+  clearPacTokenBackup,
+  getPacTokenCookie,
+  setPacTokenCookie,
+};
