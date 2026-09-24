@@ -7,12 +7,8 @@ const fs = require('fs');
 const { app, BrowserWindow } = require('electron');
 
 // 用已登录数据的副本，保证点歌能成功（歌词随播放接口一并返回）
-const REAL_UD = process.env.MIGU_TEST_UD || path.join(__dirname, 'dist', '咪咕音乐', 'resources', 'app', '.userdata');
-const TEST_UD = path.join(__dirname, '.userdata-test');
-if (!fs.existsSync(TEST_UD) && fs.existsSync(REAL_UD)) {
-  fs.cpSync(REAL_UD, TEST_UD, { recursive: true });
-}
-app.setPath('userData', fs.existsSync(TEST_UD) ? TEST_UD : path.join(__dirname, '.userdata'));
+const { prepareUserData } = require('./test-util');
+app.setPath('userData', prepareUserData('.userdata-test'));
 
 const { registerIpc } = require('./src/ipc');
 const lyricWin = require('./src/lyric-window');
@@ -34,7 +30,6 @@ app.whenReady().then(async () => {
     getAuthState: () => ({ loggedIn: false, nickname: '', avatar: '', userId: '' }),
     login: async () => ({ ok: true }),
     logout: async () => ({ ok: true }),
-    confirmLogin: async () => ({ ok: true }),
     getSettings: () => settings.all(),
     setSettings: (p) => settings.set(p),
     lyricToggle: () => lyricWin.toggle(__dirname),

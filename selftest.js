@@ -40,7 +40,6 @@ async function main() {
     getAuthState: () => ({ loggedIn: false, nickname: '', avatar: '', userId: '' }),
     login: async () => ({ ok: true }),
     logout: async () => ({ ok: true }),
-    confirmLogin: async () => ({ ok: true }),
   });
 
   console.log('=== 咪咕音乐客户端 自检 ===\n');

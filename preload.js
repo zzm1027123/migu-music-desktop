@@ -23,29 +23,24 @@ contextBridge.exposeInMainWorld('migu', {
   addToPlaylist: (musicListId, contentIds) => ipcRenderer.invoke('playlist:add', musicListId, contentIds),
   removeFromPlaylist: (musicListId, contentIds) =>
     ipcRenderer.invoke('playlist:remove', musicListId, contentIds),
-  checkInPlaylists: (ids) => ipcRenderer.invoke('playlist:check', ids),
   playlistSongs: (id, pageNo, pageSize) => ipcRenderer.invoke('playlist:songs', id, pageNo, pageSize),
   playlistAllSongs: (id) => ipcRenderer.invoke('playlist:allSongs', id),
-  playlistInfo: (id) => ipcRenderer.invoke('playlist:info', id),
 
   // 登录
   login: () => ipcRenderer.invoke('auth:login'),
   logout: () => ipcRenderer.invoke('auth:logout'),
   authStatus: () => ipcRenderer.invoke('auth:status'),
-  confirmLogin: () => ipcRenderer.invoke('auth:confirm'),
 
   // 自动登录用的账号密码（加密存在本机）
   credStatus: () => ipcRenderer.invoke('cred:status'),
   credSave: (username, password) => ipcRenderer.invoke('cred:save', username, password),
   credClear: () => ipcRenderer.invoke('cred:clear'),
-  credLoginNow: () => ipcRenderer.invoke('cred:loginNow'),
   onAuthChanged: (cb) => {
     const h = (_e, payload) => cb(payload);
     ipcRenderer.on('auth:changed', h);
     return () => ipcRenderer.removeListener('auth:changed', h);
   },
 
-  openExternal: (url) => ipcRenderer.invoke('app:openExternal', url),
   info: () => ipcRenderer.invoke('app:info'),
 
   // 设置 / 窗口
@@ -59,7 +54,6 @@ contextBridge.exposeInMainWorld('migu', {
     return () => ipcRenderer.removeListener('settings:changed', h);
   },
   minimizeToTray: () => ipcRenderer.invoke('app:minimizeToTray'),
-  showWindow: () => ipcRenderer.invoke('app:showWindow'),
   quitApp: () => ipcRenderer.invoke('app:quit'),
 
   // 托盘菜单发来的播放控制
@@ -106,5 +100,4 @@ contextBridge.exposeInMainWorld('migu', {
   logPath: () => ipcRenderer.invoke('log:path'),
   logStats: () => ipcRenderer.invoke('log:stats'),
   logClean: (days) => ipcRenderer.invoke('log:clean', days),
-  logWrite: (level, msg) => ipcRenderer.invoke('log:write', level, msg),
 });

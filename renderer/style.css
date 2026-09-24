@@ -394,10 +394,6 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 .s-cover { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: var(--bg-thumb); }
 .s-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
 .s-artist, .s-album { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; }
-.s-actions { display: flex; gap: 4px; justify-content: flex-end; opacity: 0; transition: opacity .15s; }
-.song-row:hover .s-actions { opacity: 1; }
-.s-actions .icon-btn { width: 28px; height: 28px; }
-.s-actions svg { width: 15px; height: 15px; }
 .s-dur { font-size: 12px; color: var(--text-3); text-align: right; }
 
 .tag-vip {
@@ -763,7 +759,6 @@ input[type="range"]::-webkit-slider-thumb {
 /* 「加入歌单」弹窗底部的「新建并加入」 */
 .pl-item.pl-new-item { justify-content: center; color: var(--text-3); }
 .pl-item.pl-new-item:hover { color: var(--brand); }
-.pl-group { font-size: 10.5px; color: var(--text-3); letter-spacing: 1.2px; padding: 10px 10px 4px; }
 
 /* 歌曲行里的「加入歌单」小按钮 */
 .song-row { grid-template-columns: 44px 44px 1fr 1fr 116px 76px 34px; }

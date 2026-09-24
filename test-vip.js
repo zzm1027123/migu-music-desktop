@@ -6,15 +6,8 @@ const path = require('path');
 const fs = require('fs');
 const { app } = require('electron');
 
-const REAL_UD = process.env.MIGU_TEST_UD || path.join(__dirname, 'dist', '咪咕音乐', 'resources', 'app', '.userdata');
-const TEST_UD = path.join(__dirname, '.userdata-test');
-
-// 复制一份登录数据，避免与正在运行的客户端争用同一 userData
-if (!fs.existsSync(TEST_UD)) {
-  console.log('复制登录数据副本…');
-  fs.cpSync(REAL_UD, TEST_UD, { recursive: true });
-}
-app.setPath('userData', TEST_UD);
+const { prepareUserData } = require('./test-util');
+app.setPath('userData', prepareUserData('.userdata-test'));
 
 const LOG = path.join(__dirname, 'test-vip-output.txt');
 fs.writeFileSync(LOG, '');

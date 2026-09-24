@@ -66,6 +66,19 @@ npm start
 npm run build:portable   # 重新生成 dist\咪咕音乐\
 ```
 
+> 打包时会顺手做两处精简，都是可再生、且**不影响登录态**的内容：
+>
+> | 精简项 | 省下 |
+> |---|---|
+> | Electron 自带的 54 个语言包（只留简中 + 英文兜底） | 约 45 MB |
+> | `.userdata` 里的 Chromium 缓存（`Cache` / `Code Cache` / `GPUCache` …） | 约 26 MB |
+>
+> 登录相关的东西一样没动：Cookie 在 `Network/`、登录令牌在 `Local Storage/`、
+> 解密 Cookie 用的密钥在 `Local State`。
+>
+> ⚠️ 打包前先**退出正在运行的客户端**：它会独占 `dist` 里的文件，
+> 从 `.userdata` 到 `咪咕音乐.exe` 都移不动，打包会半路失败。
+
 > 若 `npm install` 之后 `node_modules/electron/dist` 为空（公司网络 / 沙箱拦截了 postinstall），
 > 可手动下载对应版本二进制并解压到该目录：
 >
@@ -93,6 +106,11 @@ npm run test:suggest # 校验搜索预测（热搜 / 联想 / 点选 / 键盘选
 npm run check:cookies # 只读诊断：查看本地登录票据是否还在
 npm run icons        # 重新生成托盘/应用图标
 ```
+
+> 需要登录态的测试会先把 `dist` 里的登录数据**复制一份**到 `.userdata-xxx/` 再跑，
+> 不碰你正在用的数据，也不和运行中的客户端抢文件。复制只取登录态与设置
+> （Cookie、`localStorage` 里的登录令牌、`login/auth.json`），跳过 `Cache` / `Code Cache`
+> 这类纯缓存 —— 它们对测试没用（约 26MB），客户端开着时还会被独占锁定、复制直接报 EACCES。
 
 实测结果（本机 2026-09）：
 

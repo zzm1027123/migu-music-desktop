@@ -10,10 +10,8 @@ const path = require('path');
 const fs = require('fs');
 const { app, BrowserWindow } = require('electron');
 
-const REAL_UD = process.env.MIGU_TEST_UD || path.join(__dirname, 'dist', '咪咕音乐', 'resources', 'app', '.userdata');
-const TEST_UD = path.join(__dirname, '.userdata-theme');
-if (!fs.existsSync(TEST_UD) && fs.existsSync(REAL_UD)) fs.cpSync(REAL_UD, TEST_UD, { recursive: true });
-app.setPath('userData', fs.existsSync(TEST_UD) ? TEST_UD : path.join(__dirname, '.userdata'));
+const { prepareUserData } = require('./test-util');
+app.setPath('userData', prepareUserData('.userdata-theme'));
 
 const { registerIpc } = require('./src/ipc');
 const settings = require('./src/settings');
@@ -39,7 +37,6 @@ registerIpc({
   getAuthState: () => ({ loggedIn: true, nickname: '测试用户', avatar: '', userId: '' }),
   login: async () => ({ ok: true }),
   logout: async () => ({ ok: true }),
-  confirmLogin: async () => ({ ok: true }),
   getSettings: () => settings.all(),
   setSettings: (p) => settings.set(p),
 });

@@ -190,7 +190,6 @@ async function persistLoginTickets(sess, days = 30, opts = {}) {
 
 module.exports = {
   LOGIN_TICKET_NAMES,
-  TICKET_DOMAINS,
   fullCookies,
   persistLoginTickets,
   backupPacToken,

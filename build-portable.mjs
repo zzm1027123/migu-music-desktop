@@ -42,6 +42,22 @@ fs.mkdirSync(OUT, { recursive: true });
 console.log('复制 Electron 运行时…');
 fs.cpSync(SRC, OUT, { recursive: true });
 
+// 精简语言包：Electron 自带 55 种语言、约 48MB，而界面只有中文。
+// 留简中，并留英文作为「系统语言没有对应 pak 时」的兜底，其余全删。
+const LOCALES_KEEP = new Set(['zh-CN.pak', 'en-US.pak']);
+const localesDir = path.join(OUT, 'locales');
+let locDropped = 0;
+let locBytes = 0;
+if (fs.existsSync(localesDir)) {
+  for (const f of fs.readdirSync(localesDir)) {
+    if (LOCALES_KEEP.has(f)) continue;
+    locBytes += fs.statSync(path.join(localesDir, f)).size;
+    fs.unlinkSync(path.join(localesDir, f));
+    locDropped++;
+  }
+  console.log(`精简语言包：删除 ${locDropped} 个，省 ${(locBytes / 1048576).toFixed(1)} MB`);
+}
+
 console.log('写入应用代码…');
 const APP = path.join(OUT, 'resources', 'app');
 fs.mkdirSync(APP, { recursive: true });
@@ -80,6 +96,27 @@ if (hadUserData) {
     fs.cpSync(UD_BACKUP, APP_UD, { recursive: true });
     fs.rmSync(UD_BACKUP, { recursive: true, force: true });
   }
+
+  // 清掉 Chromium 的纯缓存目录：运行时会自动重建，删了只影响首次加载速度。
+  // 注意必须保留这几个 —— Network/（Cookie）、Local Storage/（登录令牌）、
+  // login/（应用自己的票据）、Local State（解密 Cookie 用的密钥，删了等于掉登录）。
+  const CACHE_DIRS = ['Cache', 'Code Cache', 'GPUCache', 'DawnGraphiteCache', 'DawnWebGPUCache'];
+  const dirSize = (d) => {
+    let t = 0;
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const q = path.join(d, e.name);
+      t += e.isDirectory() ? dirSize(q) : fs.statSync(q).size;
+    }
+    return t;
+  };
+  let cacheBytes = 0;
+  for (const d of CACHE_DIRS) {
+    const p = path.join(APP_UD, d);
+    if (!fs.existsSync(p)) continue;
+    cacheBytes += dirSize(p);
+    fs.rmSync(p, { recursive: true, force: true });
+  }
+  if (cacheBytes) console.log(`清理运行缓存：省 ${(cacheBytes / 1048576).toFixed(1)} MB`);
 }
 
 const size = (() => {

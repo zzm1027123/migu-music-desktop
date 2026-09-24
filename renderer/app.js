@@ -20,7 +20,6 @@ const state = {
   lyricIndex: -1,
   seeking: false,
   ranks: [],
-  lastRank: null,
   failStreak: 0,
   playToken: 0, // 每次点歌自增；旧流程被取代后不再产生任何提示
   playEngineReady: false,
@@ -93,7 +92,6 @@ function songRowsHtml(songs, startIndex = 0, opts = {}) {
     .join('');
 }
 
-let markToken = 0;
 
 /**
  * 用官方 can-listen 接口批量标注受限曲目，
@@ -331,7 +329,6 @@ async function renderRankDetail(rankId, pageNo = 1) {
   view.innerHTML = loadingHtml('正在加载榜单歌曲…');
   try {
     const data = await window.migu.rankSongs(rankId, pageNo, PAGE_SIZE);
-    state.lastRank = data;
     const start = (data.page - 1) * data.pageSize;
     view.innerHTML =
       `<div class="back-bar"><button class="back-btn" id="backBtn">← 返回排行榜</button></div>
@@ -476,15 +473,6 @@ function updateNowPlaying(song) {
   if (lpArtist) lpArtist.textContent = song ? artists : '选择一首歌开始';
 }
 
-/** 把歌曲加入播放队列（去重），返回其在队列中的下标 */
-function enqueue(song) {
-  const i = state.queue.findIndex((s) => s.contentId && s.contentId === song.contentId);
-  if (i >= 0) return i;
-  state.queue.push(song);
-  updateQueueUi();
-  return state.queue.length - 1;
-}
-
 /** 播放某个列表的第 i 首：整列表替换为播放队列 */
 async function playAt(songs, i) {
   if (!songs || !songs[i]) return;
@@ -591,7 +579,6 @@ const SUGGEST_ICON = {
 };
 
 let suggestTimer = null;
-let suggestHideTimer = null;
 let suggestFlat = []; // 当前可键盘选择的项
 let suggestActive = -1;
 let suggestSeq = 0; // 防止慢请求覆盖新结果
@@ -695,6 +682,9 @@ async function refreshSuggest() {
       return;
     }
     const s = await window.migu.suggest(kw);
+    // 和上面「热门搜索」那条分支一样要检查序号：用户可能已经点了某条建议，
+    // 这个请求回来时若无条件 renderSuggest，面板就会在搜索之后又弹出来挡住结果。
+    if (seq !== suggestSeq) return;
     if (seq !== suggestSeq) return;
     const groups = [];
     if (s && s.singers && s.singers.length) {
@@ -928,7 +918,6 @@ function syncLyric(cur) {
 
 /* --------------------------------------------- 自动跟随 / 手动浏览歌词 */
 
-let followBtnTimer = null;
 /** 开启/关闭自动跟随。关闭时会浮出「回到当前」按钮 */
 function updateFollowBtn() {
   const btn = $('#lyricFollowBtn');

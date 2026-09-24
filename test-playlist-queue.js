@@ -8,12 +8,8 @@ const path = require('path');
 const fs = require('fs');
 const { app, BrowserWindow } = require('electron');
 
-const REAL_UD = process.env.MIGU_TEST_UD || path.join(__dirname, 'dist', '咪咕音乐', 'resources', 'app', '.userdata');
-const TEST_UD = path.join(__dirname, '.userdata-plq');
-if (!fs.existsSync(TEST_UD) && fs.existsSync(REAL_UD)) {
-  fs.cpSync(REAL_UD, TEST_UD, { recursive: true });
-}
-app.setPath('userData', fs.existsSync(TEST_UD) ? TEST_UD : path.join(__dirname, '.userdata'));
+const { prepareUserData } = require('./test-util');
+app.setPath('userData', prepareUserData('.userdata-plq'));
 
 const { registerIpc } = require('./src/ipc');
 const logger = require('./src/logger');
@@ -47,7 +43,6 @@ registerIpc({
   },
   login: async () => ({ ok: true }),
   logout: async () => ({ ok: true }),
-  confirmLogin: async () => ({ ok: true }),
   getSettings: () => ({}),
   setSettings: (p) => p,
 });
@@ -99,10 +94,15 @@ app.whenReady().then(async () => {
     else bad('当前页数量异常：' + pageInfo.rows);
     if (pageInfo.hasPlayAll) ok('有「播放全部」按钮：' + pageInfo.playAllText);
     else bad('缺少播放全部按钮');
+    // 歌单会一直变长，按钮上的总数就是权威值，别写死数字
+    const totalSongs = Number((pageInfo.playAllText.match(/(\d+)\s*首/) || [])[1] || 0);
 
-    say('\n[2] 点第 1 页的第 1 首歌（队列应被补全为整个歌单）');
+    say('\n[2] 点第 1 页第 1 首能播的歌（队列应被补全为整个歌单）');
     await win.webContents.executeJavaScript(
-      `(()=>{const r=document.querySelector('#plSongList .song-row'); r.dispatchEvent(new MouseEvent('dblclick',{bubbles:true})); return 1})()`,
+      `(()=>{const rows=[...document.querySelectorAll('#plSongList .song-row')];
+         // 歌单开头可能是受限曲目（点了也不会出声），挑第一首能播的
+         const r=rows.find(x=>!x.classList.contains('restricted')) || rows[0];
+         r.dispatchEvent(new MouseEvent('dblclick',{bubbles:true})); return 1})()`,
       true
     );
     await wait(4000);
@@ -194,8 +194,9 @@ app.whenReady().then(async () => {
       )
     );
     say('      ' + JSON.stringify(all));
-    if (Number(all.queue) === 201 && all.playing) ok('播放全部：队列 201 首并已开始播放');
-    else bad('播放全部异常：' + JSON.stringify(all));
+    if (Number(all.queue) === totalSongs && all.playing)
+      ok(`播放全部：队列 ${totalSongs} 首并已开始播放`);
+    else bad(`播放全部异常（期望队列 ${totalSongs} 首）：` + JSON.stringify(all));
   } catch (e) {
     bad('异常 ' + (e && e.stack ? e.stack : e));
   }

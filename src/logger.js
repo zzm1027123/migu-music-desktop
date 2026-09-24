@@ -180,9 +180,6 @@ function getFile() {
 function getDir() {
   return logDir;
 }
-function isReady() {
-  return ready;
-}
 
 module.exports = {
   init,
@@ -190,11 +187,8 @@ module.exports = {
   warn,
   error,
   playResolve,
-  redactUrl,
-  listFiles,
   stats,
   cleanOlderThan,
   getFile,
   getDir,
-  isReady,
 };

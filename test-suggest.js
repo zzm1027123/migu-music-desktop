@@ -34,7 +34,6 @@ registerIpc({
   getAuthState: () => ({ loggedIn: false, nickname: '', avatar: '', userId: '' }),
   login: async () => ({ ok: true }),
   logout: async () => ({ ok: true }),
-  confirmLogin: async () => ({ ok: true }),
   getSettings: () => ({}),
   setSettings: (p) => p,
 });

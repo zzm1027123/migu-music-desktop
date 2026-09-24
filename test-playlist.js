@@ -7,12 +7,8 @@ const path = require('path');
 const fs = require('fs');
 const { app, BrowserWindow } = require('electron');
 
-const REAL_UD = process.env.MIGU_TEST_UD || path.join(__dirname, 'dist', '咪咕音乐', 'resources', 'app', '.userdata');
-const TEST_UD = path.join(__dirname, '.userdata-playlist');
-if (!fs.existsSync(TEST_UD) && fs.existsSync(REAL_UD)) {
-  fs.cpSync(REAL_UD, TEST_UD, { recursive: true });
-}
-app.setPath('userData', fs.existsSync(TEST_UD) ? TEST_UD : path.join(__dirname, '.userdata'));
+const { prepareUserData } = require('./test-util');
+app.setPath('userData', prepareUserData('.userdata-playlist'));
 
 const { registerIpc } = require('./src/ipc');
 const logger = require('./src/logger');
@@ -42,7 +38,6 @@ registerIpc({
   getAuthState: () => ({ loggedIn: true, nickname: '', avatar: '', userId: '' }),
   login: async () => ({ ok: true }),
   logout: async () => ({ ok: true }),
-  confirmLogin: async () => ({ ok: true }),
   getSettings: () => ({}),
   setSettings: (p) => p,
 });
@@ -166,9 +161,15 @@ app.whenReady().then(async () => {
       bad('未登录时缺少重新登录入口：' + mm.empty);
     }
 
-    const img = await win.webContents.capturePage();
-    fs.writeFileSync(path.join(__dirname, 'screenshot-playlist.png'), img.toPNG());
-    say('      截图：screenshot-playlist.png');
+    // 截图只是留证：某些桌面状态下会拿不到画面（Current display surface not
+    // available for capture），不该因此把功能判定成失败
+    try {
+      const img = await win.webContents.capturePage();
+      fs.writeFileSync(path.join(__dirname, 'screenshot-playlist.png'), img.toPNG());
+      say('      截图：screenshot-playlist.png');
+    } catch (e) {
+      say('      （截图跳过：' + ((e && e.message) || e) + '）');
+    }
   } catch (e) {
     bad('异常 ' + (e && e.stack ? e.stack : e));
   }

@@ -6,12 +6,8 @@ const path = require('path');
 const fs = require('fs');
 const { app, BrowserWindow } = require('electron');
 
-const REAL_UD = process.env.MIGU_TEST_UD || path.join(__dirname, 'dist', '咪咕音乐', 'resources', 'app', '.userdata');
-const TEST_UD = path.join(__dirname, '.userdata-pager');
-if (!fs.existsSync(TEST_UD) && fs.existsSync(REAL_UD)) {
-  fs.cpSync(REAL_UD, TEST_UD, { recursive: true });
-}
-app.setPath('userData', fs.existsSync(TEST_UD) ? TEST_UD : path.join(__dirname, '.userdata'));
+const { prepareUserData } = require('./test-util');
+app.setPath('userData', prepareUserData('.userdata-pager'));
 
 const { registerIpc } = require('./src/ipc');
 const logger = require('./src/logger');
@@ -40,7 +36,6 @@ registerIpc({
   },
   login: async () => ({ ok: true }),
   logout: async () => ({ ok: true }),
-  confirmLogin: async () => ({ ok: true }),
   getSettings: () => ({}),
   setSettings: (p) => p,
 });
@@ -77,7 +72,7 @@ app.whenReady().then(async () => {
     await wait(6500);
 
     // ---------- 歌单 ----------
-    say('[1] 歌单分页（我喜欢的 201 首）');
+    say('[1] 歌单分页（我喜欢的）');
     await win.webContents.executeJavaScript(
       `(()=>{document.querySelector('.nav-item[data-view="mymusic"]').click();return 1})()`,
       true
@@ -96,9 +91,14 @@ app.whenReady().then(async () => {
     else bad('第 1 页数量不是 20：' + p1.rows);
     if (p1.firstIdx === '1' && p1.lastIdx === '20') ok('序号 1 → 20');
     else bad(`序号异常：${p1.firstIdx} → ${p1.lastIdx}`);
-    if (p1.pager && p1.pageBtns.includes('1') && p1.pageBtns.includes('11')) ok('分页控件出现（201 首 / 20 = 11 页）');
+    // 歌单会一直变长，页数与总数一律从界面上的实际值推导，不写死数字 ——
+    // 之前写死「201 首 / 11 页」，歌单涨到 243 首后断言就全挂了。
+    const total = Number((p1.totalText.match(/共\s*(\d+)\s*首/) || [])[1] || 0);
+    const lastPage = Number(p1.pageBtns[p1.pageBtns.length - 1] || 0);
+    if (p1.pager && p1.pageBtns.includes('1') && lastPage > 1)
+      ok(`分页控件出现（共 ${total} 首 / 20 = ${lastPage} 页）`);
     else bad('分页控件异常：' + JSON.stringify(p1.pageBtns));
-    if (/201/.test(p1.totalText)) ok('显示总数：' + p1.totalText);
+    if (total > 0 && p1.totalText.includes(String(total))) ok('显示总数：' + p1.totalText);
     else bad('总数显示异常：' + p1.totalText);
 
     say('\n[2] 翻到第 2 页');
@@ -117,17 +117,22 @@ app.whenReady().then(async () => {
     if (p2.current === '2') ok('页码高亮切到第 2 页');
     else bad('页码高亮异常：' + p2.current);
 
-    say('\n[3] 跳到最后一页（201 首 -> 第 11 页应只有 1 首）');
+    const expectLastRows = total - (lastPage - 1) * 20;
+    const expectLastFirst = (lastPage - 1) * 20 + 1;
+    say(`\n[3] 跳到最后一页（共 ${total} 首 -> 第 ${lastPage} 页应有 ${expectLastRows} 首）`);
     await win.webContents.executeJavaScript(
-      `(()=>{const b=[...document.querySelectorAll('.pager .pg-num')].find(e=>e.textContent==='11');
+      `(()=>{const all=[...document.querySelectorAll('.pager .pg-num')];
+         const b=all.find(e=>e.textContent==='${lastPage}');
+         if(!b) throw new Error('页面上没有第 ${lastPage} 页按钮，实际是：'+all.map(e=>e.textContent).join(','));
          b.click();return 1})()`,
       true
     );
     await wait(8000);
     const p5 = JSON.parse(await win.webContents.executeJavaScript(SNAP('#plSongList'), true));
-    say('      第11页：' + JSON.stringify(p5));
-    if (p5.rows === 1 && p5.firstIdx === '201') ok('末页只剩 1 首，序号 201');
-    else bad(`末页异常：${p5.rows} 首，序号 ${p5.firstIdx}`);
+    say(`      第${lastPage}页：` + JSON.stringify(p5));
+    if (p5.rows === expectLastRows && p5.firstIdx === String(expectLastFirst))
+      ok(`末页只剩 ${expectLastRows} 首，序号 ${expectLastFirst}`);
+    else bad(`末页异常：${p5.rows} 首（期望 ${expectLastRows}），序号 ${p5.firstIdx}（期望 ${expectLastFirst}）`);
 
     say('\n[4] 下一页按钮在末页应禁用');
     const disabled = await win.webContents.executeJavaScript(

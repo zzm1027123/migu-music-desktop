@@ -6,12 +6,8 @@ const path = require('path');
 const fs = require('fs');
 const { app, BrowserWindow } = require('electron');
 
-const REAL_UD = process.env.MIGU_TEST_UD || path.join(__dirname, 'dist', '咪咕音乐', 'resources', 'app', '.userdata');
-const TEST_UD = path.join(__dirname, '.userdata-mymusic');
-if (!fs.existsSync(TEST_UD) && fs.existsSync(REAL_UD)) {
-  fs.cpSync(REAL_UD, TEST_UD, { recursive: true });
-}
-app.setPath('userData', fs.existsSync(TEST_UD) ? TEST_UD : path.join(__dirname, '.userdata'));
+const { prepareUserData } = require('./test-util');
+app.setPath('userData', prepareUserData('.userdata-mymusic'));
 
 const { registerIpc } = require('./src/ipc');
 const logger = require('./src/logger');
@@ -43,7 +39,6 @@ registerIpc({
   },
   login: async () => ({ ok: true }),
   logout: async () => ({ ok: true }),
-  confirmLogin: async () => ({ ok: true }),
   getSettings: () => ({}),
   setSettings: (p) => p,
 });
@@ -89,6 +84,7 @@ app.whenReady().then(async () => {
            cards: [...document.querySelectorAll('.pl-card')].map(e => ({
              title: e.querySelector('.c-name').textContent,
              sub: e.querySelector('.c-sub').textContent,
+             isNew: e.classList.contains('pl-new'),
              hasPlus: !!e.querySelector('.c-play')
            })),
            sections: [...document.querySelectorAll('.section-title')].map(e => e.textContent),
@@ -110,8 +106,11 @@ app.whenReady().then(async () => {
     else bad('没有歌单卡片');
     if (page.cards.some((c) => c.title === '我喜欢的')) ok('包含「我喜欢的」卡片');
     else bad('缺少我喜欢的卡片');
-    if (page.cards.every((c) => c.hasPlus)) ok('每张卡片都带「加入」按钮');
-    else bad('有卡片缺少加入按钮');
+    // 「新建歌单」是虚线创建卡片，本来就没有「加入」入口，只校验真实歌单卡片
+    const realCards = page.cards.filter((c) => !c.isNew);
+    if (realCards.length && realCards.every((c) => c.hasPlus))
+      ok(`每张歌单卡片都带「加入」按钮（${realCards.length} 张）`);
+    else bad('有卡片缺少加入按钮：' + JSON.stringify(realCards.filter((c) => !c.hasPlus)));
 
     const img = await win.webContents.capturePage();
     fs.writeFileSync(path.join(__dirname, 'screenshot-mymusic.png'), img.toPNG());

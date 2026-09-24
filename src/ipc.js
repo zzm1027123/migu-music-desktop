@@ -13,7 +13,6 @@ const logger = require('./logger');
  * @param {() => object} ctx.getAuthState  返回当前登录态
  * @param {() => Promise<any>} ctx.login   打开登录窗口
  * @param {() => Promise<any>} ctx.logout  退出登录
- * @param {() => Promise<any>} [ctx.confirmLogin] 手动确认登录
  */
 function registerIpc(ctx) {
   // 内容
@@ -66,7 +65,6 @@ function registerIpc(ctx) {
     return failed;
   });
   ipcMain.handle('migu:canListen', (_e, ids) => resolver.canListen(ids));
-  ipcMain.handle('app:resolverStatus', () => resolver.status());
 
   // 我的歌单 / 收藏
   ipcMain.handle('playlist:mine', () => playlist.getMyPlaylists());
@@ -76,30 +74,23 @@ function registerIpc(ctx) {
   ipcMain.handle('playlist:remove', (_e, musicListId, contentIds) =>
     playlist.removeSongs(musicListId, contentIds)
   );
-  ipcMain.handle('playlist:check', (_e, ids) => playlist.checkInPlaylists(ids));
   ipcMain.handle('playlist:songs', (_e, id, pageNo, pageSize) =>
     playlist.getPlaylistSongs(id, pageNo, pageSize)
   );
   ipcMain.handle('playlist:allSongs', (_e, id) => playlist.getAllPlaylistSongs(id));
-  ipcMain.handle('playlist:info', (_e, id) => playlist.getPlaylistInfo(id));
   ipcMain.handle('migu:lyric', (_e, url) => api.lyric(url));
 
   // 登录
   ipcMain.handle('auth:login', () => ctx.login());
   ipcMain.handle('auth:logout', () => ctx.logout());
   ipcMain.handle('auth:status', () => ctx.getAuthState());
-  ipcMain.handle('auth:confirm', () => (ctx.confirmLogin ? ctx.confirmLogin() : { ok: false }));
 
   // 自动登录用的账号密码（加密存在本机）
   ipcMain.handle('cred:status', () => (ctx.credStatus ? ctx.credStatus() : { supported: false, hasSaved: false }));
   ipcMain.handle('cred:save', (_e, u, p) => (ctx.credSave ? ctx.credSave(_e, u, p) : { ok: false }));
   ipcMain.handle('cred:clear', () => (ctx.credClear ? ctx.credClear() : { ok: false }));
-  ipcMain.handle('cred:loginNow', () => (ctx.credLoginNow ? ctx.credLoginNow() : { ok: false }));
 
   // 其它
-  ipcMain.handle('app:openExternal', (_e, url) => {
-    if (/^https?:/.test(url)) shell.openExternal(url);
-  });
   ipcMain.handle('app:info', () => ({
     version: app.getVersion(),
     electron: process.versions.electron,
@@ -110,7 +101,6 @@ function registerIpc(ctx) {
   ipcMain.handle('settings:get', () => (ctx.getSettings ? ctx.getSettings() : {}));
   ipcMain.handle('settings:set', (_e, patch) => (ctx.setSettings ? ctx.setSettings(patch || {}) : {}));
   ipcMain.handle('app:minimizeToTray', () => (ctx.minimizeToTray ? ctx.minimizeToTray() : { ok: false }));
-  ipcMain.handle('app:showWindow', () => (ctx.showWindow ? ctx.showWindow() : { ok: false }));
   ipcMain.handle('app:quit', () => (ctx.quitApp ? ctx.quitApp() : { ok: false }));
 
   // 桌面歌词悬浮窗
@@ -142,13 +132,6 @@ function registerIpc(ctx) {
   ipcMain.handle('log:path', () => ({ file: logger.getFile() || '', dir: logger.getDir() || '' }));
   ipcMain.handle('log:stats', () => logger.stats());
   ipcMain.handle('log:clean', (_e, days) => logger.cleanOlderThan(days));
-  ipcMain.handle('log:write', (_e, level, msg) => {
-    const text = String(msg == null ? '' : msg);
-    if (level === 'error') logger.error('[界面]', text);
-    else if (level === 'warn') logger.warn('[界面]', text);
-    else logger.info('[界面]', text);
-    return { ok: true };
-  });
 }
 
 module.exports = { registerIpc };

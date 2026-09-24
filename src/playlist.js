@@ -166,16 +166,6 @@ async function getAllPlaylistSongs(playlistId, maxPages = 40) {
   return { ok: true, songs: all, total: total || all.length };
 }
 
-/** 歌单基本信息（封面、简介、创建时间等） */
-async function getPlaylistInfo(playlistId) {
-  const r = await resolver.webCall('/resource/playlist/v2.0', { playlistId: String(playlistId) });
-  const res = r && r.res;
-  if (!r || !r.ok || !res || res.code !== '000000') {
-    return { ok: false, error: (res && res.info) || r.err || '读取歌单信息失败' };
-  }
-  return { ok: true, info: res.data || {} };
-}
-
 /**
  * 把歌曲加入歌单。
  * @param {string} musicListId 目标歌单；传空则加入「我喜欢的」
@@ -349,5 +339,4 @@ module.exports = {
   checkInPlaylists,
   getPlaylistSongs,
   getAllPlaylistSongs,
-  getPlaylistInfo,
 };

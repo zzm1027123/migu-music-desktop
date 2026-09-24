@@ -148,8 +148,6 @@ const lyricWin = require('./src/lyric-window');
 
 const LOGIN_URL =
   'https://music.migu.cn/v5/#/musicLibrary';
-const PASSPORT_URL =
-  'https://passport.migu.cn/login?sourceid=220029&forceAuthn=true&hideRegister=1&hideForgetPass=1&callbackURL=PostToken';
 
 let mainWindow = null;
 let loginWindow = null;
@@ -817,7 +815,6 @@ const ipcContext = {
   getAuthState: () => checkAuth(),
   login: () => openLoginWindow(),
   logout: () => logout(),
-  confirmLogin: () => finishLogin('manual'),
   getSettings: () => settings.all(),
   setSettings: (patch) => {
     const next = settings.set(patch);
@@ -826,10 +823,6 @@ const ipcContext = {
   },
   minimizeToTray: () => {
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.hide();
-    return { ok: true };
-  },
-  showWindow: () => {
-    showMainWindow();
     return { ok: true };
   },
   quitApp: () => {
@@ -844,7 +837,6 @@ const ipcContext = {
   }),
   credSave: (_e, username, password) => credentials.save(LOGIN_DIR, username, password),
   credClear: () => ({ ok: credentials.clear(LOGIN_DIR) }),
-  credLoginNow: () => tryAutoLogin(),
   lyricToggle: () => toggleLyricWindow(),
   lyricClose: () => {
     const r = lyricWin.close();

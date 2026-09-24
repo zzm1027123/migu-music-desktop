@@ -6,7 +6,8 @@ const path = require('path');
 const fs = require('fs');
 const { app, BrowserWindow, session } = require('electron');
 
-app.setPath('userData', process.env.MIGU_TEST_UD || path.join(__dirname, 'dist', '咪咕音乐', 'resources', 'app', '.userdata'));
+const { prepareUserData } = require('./test-util');
+app.setPath('userData', prepareUserData('.userdata-verify'));
 
 const { registerIpc } = require('./src/ipc');
 const resolver = require('./src/resolver');
@@ -23,7 +24,6 @@ registerIpc({
   getAuthState: () => ({ loggedIn: true, nickname: '', avatar: '', userId: '' }),
   login: async () => ({ ok: true }),
   logout: async () => ({ ok: true }),
-  confirmLogin: async () => ({ ok: true }),
 });
 
 app.whenReady().then(async () => {

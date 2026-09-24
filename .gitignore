@@ -15,3 +15,6 @@ dist/
 
 # 根目录下的临时截图（要发布的图放在 docs/screenshots/）
 /screenshot-*.png
+
+# DSH 工具目录（skill 库等，不属于项目本身）
+.dsh/

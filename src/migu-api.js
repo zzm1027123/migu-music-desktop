@@ -485,5 +485,4 @@ module.exports = {
   lyric,
   normalizeSongData,
   DEFAULT_USER_ID,
-  WEB_HEADERS,
 };
