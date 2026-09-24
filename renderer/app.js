@@ -287,6 +287,10 @@ async function renderRankDetail(rankId, pageNo = 1) {
 async function renderSearch(kw, pageNo = 1) {
   state.view = 'search';
   setNav('search');
+  // 搜索会换掉整个页面内容，先把歌词抽屉收起：
+  // 它是 fixed 定位的浮层，不收的话会一直盖在搜索结果上。
+  // 搜索按钮、回车、点联想词三条路径最终都走到这里，放这儿一处就够。
+  setLyricPanel(false);
   view.innerHTML = loadingHtml(`正在搜索“${esc(kw)}”…`);
   try {
     const data = await window.migu.search(kw, pageNo, PAGE_SIZE);

@@ -129,6 +129,57 @@ app.whenReady().then(async () => {
     const rows = await js(`document.querySelectorAll('#searchList .song-row').length`);
     if (rows > 0) ok(`搜索结果正常渲染了 ${rows} 行`);
     else bad('搜索结果没出来');
+
+    say('\n[5] 开着歌词点「搜索」按钮，也要收起');
+    await js(`(()=>{document.getElementById('searchInput').value='五月天';return 1})()`);
+    await openDrawer();
+    if (!(await drawerOpen())) bad('前置失败：抽屉没打开');
+    await js(`document.getElementById('searchBtn').click()`);
+    await wait(6000);
+    if (!(await drawerOpen())) ok('点搜索按钮后抽屉收起了');
+    else bad('点搜索按钮后歌词还盖在搜索结果上');
+    if (!(await btnActive())) ok('歌词按钮的高亮也清了');
+    else bad('按钮还亮着');
+    const rows2 = await js(`document.querySelectorAll('#searchList .song-row').length`);
+    if (rows2 > 0) ok(`搜索结果正常（${rows2} 行）`);
+    else bad('搜索结果没出来');
+
+    say('\n[6] 开着歌词在搜索框里回车，也要收起');
+    await openDrawer();
+    await js(`(()=>{
+      const i = document.getElementById('searchInput');
+      i.value = '陈奕迅';
+      i.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      return 1})()`);
+    await wait(6000);
+    if (!(await drawerOpen())) ok('回车搜索后抽屉收起了');
+    else bad('回车搜索后歌词还盖着');
+
+    say('\n[7] 开着歌词点联想词，也要收起');
+    // 顺序很关键：先打开歌词，再输入触发联想面板。
+    // 反过来的话，「打开歌词」这个动作会让面板收起/清空，点到的是个空壳，
+    // pickSuggest 里 suggestFlat[i] 为 undefined 会直接 return，什么都不会发生。
+    await openDrawer();
+    await js(`(()=>{const i=document.getElementById('searchInput'); i.value='林'; i.focus();
+       i.dispatchEvent(new Event('input',{bubbles:true})); return 1})()`);
+    await wait(2800);
+    const hasSuggest = await js(`document.querySelectorAll('#suggestPanel .suggest-item').length > 0`);
+    if (!hasSuggest) {
+      say('      · 此刻没有联想词可点，跳过这一项');
+    } else {
+      // 注意：联想词绑的是 mousedown（为了 preventDefault 保住输入框焦点），
+      // 用 .click() 根本不会触发，必须发 mousedown 才算模拟真实点击
+      await js(`(()=>{const el=document.querySelector('#suggestPanel .suggest-item');
+         el.dispatchEvent(new MouseEvent('mousedown',{bubbles:true,cancelable:true})); return 1})()`);
+      await wait(6000);
+      const kwShown = ((await js(`(document.querySelector('.page-sub')||{}).textContent || ''`)) || '').trim();
+      say('      页面上显示：' + kwShown);
+      if (!(await drawerOpen())) ok('点联想词后抽屉收起了');
+      else bad('点联想词后歌词还盖着');
+      // 上一轮的断言只看行数，会被「上一次搜索的残留」骗过，所以这里认关键词
+      if (/关键词/.test(kwShown)) ok('页面确实刷新成了新搜索：' + kwShown);
+      else bad('页面没更新，看到的可能是上一次的结果');
+    }
   } catch (e) {
     bad('异常 ' + (e && e.stack ? e.stack : e));
   }
