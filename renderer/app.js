@@ -187,6 +187,47 @@ function bindSongList(container, songs, opts = {}) {
 
 /* ----------------------------------------------------------- 视图渲染 */
 
+/**
+ * 「猜你喜欢」换一批。
+ *
+ * 只换这一个列表的内容，不整页重渲染 —— 否则页面会跳回顶部，
+ * 用户在首页往下翻的位置就丢了。
+ */
+async function refreshGuessList() {
+  const btn = $('#guessRefreshBtn');
+  const box = $('#guessList');
+  if (!box || !document.body.contains(box)) return;
+  if (btn && btn.disabled) return; // 防连点
+
+  const oldLabel = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '换一批…';
+  }
+  try {
+    const r = await window.migu.guessYouLike(30);
+    if (!box || !document.body.contains(box)) return; // 期间用户换了页面
+    if (r && r.ok && r.songs && r.songs.length) {
+      box.innerHTML = songRowsHtml(r.songs);
+      bindSongList(box, r.songs);
+      const sub = $('#guessSub');
+      if (sub) sub.textContent = `根据你的收听口味推荐 · 共 ${r.songs.length} 首`;
+      toast(`已换一批（${r.songs.length} 首）`, 1800);
+    } else if (r && r.needLogin) {
+      toast('登录后才能换推荐', 2600);
+    } else {
+      toast('换一批失败：' + ((r && r.error) || '未知错误'), 3200);
+    }
+  } catch (e) {
+    toast('换一批失败：' + (e.message || e), 3200);
+  } finally {
+    if (btn && document.body.contains(btn)) {
+      btn.disabled = false;
+      btn.textContent = oldLabel || '换一批';
+    }
+  }
+}
+
 async function renderHome() {
   state.view = 'home';
   setNav('home');
@@ -210,8 +251,11 @@ async function renderHome() {
     // 猜你喜欢（咪咕那边叫「私人FM」，基于收听口味）
     const guessSongs = guess && guess.ok && guess.songs ? guess.songs : [];
     if (guessSongs.length) {
-      html += `<div class="section-title">猜你喜欢</div>
-        <div class="page-sub">根据你的收听口味推荐 · 共 ${guessSongs.length} 首</div>`;
+      html += `<div class="section-title section-title-row">
+          <span>猜你喜欢</span>
+          <button class="btn-ghost small" id="guessRefreshBtn" title="再换一批推荐">换一批</button>
+        </div>
+        <div class="page-sub" id="guessSub">根据你的收听口味推荐 · 共 ${guessSongs.length} 首</div>`;
       html += `<div class="song-list" id="guessList">${songRowsHtml(guessSongs)}</div>`;
     } else if (guess && guess.needLogin) {
       html += `<div class="section-title">猜你喜欢</div>` + emptyHtml('登录后这里会出现为你推荐的歌曲');
@@ -241,6 +285,8 @@ async function renderHome() {
 
     const gl = $('#guessList');
     if (gl && guessSongs.length) bindSongList(gl, guessSongs);
+    const grb = $('#guessRefreshBtn');
+    if (grb) grb.addEventListener('click', refreshGuessList);
 
     view.querySelectorAll('.card[data-rank]').forEach((c) =>
       c.addEventListener('click', () => renderRankDetail(c.dataset.rank))

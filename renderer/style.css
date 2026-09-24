@@ -331,6 +331,11 @@ svg { width: 20px; height: 20px; fill: currentColor; display: block; }
 .section-title::before {
   content: ''; width: 3px; height: 14px; border-radius: 2px; background: var(--brand);
 }
+/* 标题右边带操作按钮（比如「猜你喜欢」的换一批）。
+   注意不能用 space-between —— 那样 ::before 那根竖条也会被当成一项分散开 */
+.section-title-row { justify-content: flex-start; gap: 9px; }
+.section-title-row > span { flex: 1; display: flex; align-items: center; }
+.section-title-row .btn-ghost.small { flex: none; }
 
 /* 卡片网格 */
 .grid {

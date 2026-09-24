@@ -55,11 +55,16 @@ const FAKE = [
   { contentId: 'g3', name: '测试推荐曲目三', artists: ['歌手C'], album: '专辑丙', duration: 240, cover: '' },
 ];
 let guessMode = 'songs';
+let guessBatch = 0; // 每调一次换一批，用来验证「换一批」真的换了内容
 ipcMain.removeHandler('migu:guessYouLike');
 ipcMain.handle('migu:guessYouLike', async () => {
   if (guessMode === 'needLogin') return { ok: false, needLogin: true, error: '登录后这里会出现为你推荐的歌曲', songs: [] };
   if (guessMode === 'error') return { ok: false, needLogin: false, error: '服务端开小差了', songs: [] };
-  return { ok: true, songs: FAKE };
+  guessBatch += 1;
+  return {
+    ok: true,
+    songs: FAKE.map((s, i) => ({ ...s, contentId: `${s.contentId}-b${guessBatch}`, name: `${s.name}·第${guessBatch}批` })),
+  };
 });
 
 app.whenReady().then(async () => {
@@ -82,7 +87,9 @@ app.whenReady().then(async () => {
       const titles = [...document.querySelectorAll('.section-title')].map(e => e.textContent.trim());
       const list = document.getElementById('guessList');
       return JSON.stringify({
-        hasTitle: titles.includes('猜你喜欢'),
+        // 标题里现在还挂着「换一批」按钮，文本不再精确等于「猜你喜欢」，
+        // 所以用包含判断（曾经因为这里写死全等而误报过）
+        hasTitle: titles.some((t) => t.includes('猜你喜欢')),
         titles,
         rows: list ? list.querySelectorAll('.song-row').length : 0,
         names: list ? [...list.querySelectorAll('.s-name')].map(e => e.textContent.trim()) : [],
@@ -123,7 +130,7 @@ app.whenReady().then(async () => {
     else {
       // .s-name 的文本里还挂着「受限 / 试听 / VIP」这些标签，比之前要先剥掉
       const clean = (s) => String(s).replace(/受限|试听|VIP/g, '').trim();
-      if (clean(g1.names[0]) === FAKE[0].name) ok('列表内容正确：' + g1.names.join(' / '));
+      if (clean(g1.names[0]).startsWith(FAKE[0].name)) ok('列表内容正确：' + g1.names.join(' / '));
       else bad('列表内容不对：' + g1.names.join(' / '));
     }
 
@@ -172,6 +179,75 @@ app.whenReady().then(async () => {
     say('      ' + JSON.stringify(g3));
     if (g3.todayRows > 0) ok('今日推荐照常渲染（猜你喜欢出错不影响首页）');
     else bad('猜你喜欢出错把今日推荐也带崩了');
+    say('\n[6] 「换一批」应当只换列表内容，不动页面其它部分');
+    // [5] 把 guessMode 设成了 error 并重渲染，此时页面上没有猜你喜欢板块，
+    // 先恢复成正常模式重新进一次首页
+    guessMode = 'songs';
+    await js(`document.querySelector('.nav-item[data-view="home"]').click()`);
+    await wait(7000);
+    const beforeClick = JSON.parse(
+      await js(`JSON.stringify({
+         names: [...document.querySelectorAll('#guessList .s-name')].map(e => e.textContent.trim()),
+         todayFirst: (document.querySelector('#todayList .s-name')||{}).textContent || '',
+         hasBtn: !!document.getElementById('guessRefreshBtn'),
+         btnText: (document.getElementById('guessRefreshBtn')||{}).textContent || '',
+         sub: (document.getElementById('guessSub')||{}).textContent || ''
+       })`)
+    );
+    say('      点击前：' + JSON.stringify({ names: beforeClick.names, sub: beforeClick.sub }));
+    if (beforeClick.hasBtn) ok('标题右边有「' + beforeClick.btnText + '」按钮');
+    else bad('没找到换一批按钮');
+
+    const batchBefore = guessBatch;
+    await js(`document.getElementById('guessRefreshBtn').click()`);
+    await wait(2500);
+    const afterClick = JSON.parse(
+      await js(`JSON.stringify({
+         names: [...document.querySelectorAll('#guessList .s-name')].map(e => e.textContent.trim()),
+         todayFirst: (document.querySelector('#todayList .s-name')||{}).textContent || '',
+         btnDisabled: (document.getElementById('guessRefreshBtn')||{}).disabled,
+         btnText: (document.getElementById('guessRefreshBtn')||{}).textContent || '',
+         toast: document.getElementById('toast').textContent,
+         sub: (document.getElementById('guessSub')||{}).textContent || ''
+       })`)
+    );
+    say('      点击后：' + JSON.stringify({ names: afterClick.names, sub: afterClick.sub, toast: afterClick.toast }));
+    if (guessBatch > batchBefore) ok(`确实又请求了一次（第 ${guessBatch} 批）`);
+    else bad('点按钮没有发起新请求');
+    if (afterClick.names.join() !== beforeClick.names.join()) ok('推荐内容换掉了');
+    else bad('内容没变（还是同一批）');
+    if (afterClick.names.length === FAKE.length) ok(`新一批仍是 ${FAKE.length} 首`);
+    else bad(`新一批数量不对：${afterClick.names.length}`);
+    // 不硬编码批次号：[5] 恢复页面时已经消耗过一批，具体是第几批不该写死
+    const batchOf = (n) => {
+      const m = /第(\d+)批/.exec(String(n || ''));
+      return m ? Number(m[1]) : 0;
+    };
+    const b0 = batchOf(beforeClick.names[0]);
+    const b1 = batchOf(afterClick.names[0]);
+    if (b1 > b0) ok(`批次确实往后走了：第 ${b0} 批 → 第 ${b1} 批`);
+    else bad(`批次没有前进：第 ${b0} 批 → 第 ${b1} 批`);
+    if (afterClick.todayFirst === beforeClick.todayFirst) ok('今日推荐没被动过（只换了猜你喜欢）');
+    else bad('今日推荐也被重渲染了');
+    if (!afterClick.btnDisabled && /换一批/.test(afterClick.btnText)) ok('按钮状态已恢复：' + afterClick.btnText);
+    else bad('按钮没恢复：disabled=' + afterClick.btnDisabled + ' text=' + afterClick.btnText);
+    if (/已换一批/.test(afterClick.toast)) ok('给了提示：' + afterClick.toast);
+    else bad('没有换一批的提示：' + afterClick.toast);
+    if (/共 3 首/.test(afterClick.sub)) ok('副标题跟着更新：' + afterClick.sub);
+    else bad('副标题没更新：' + afterClick.sub);
+
+    say('\n[7] 换一批失败时要给出提示，不能默默不动');
+    guessMode = 'error';
+    await js(`document.getElementById('guessRefreshBtn').click()`);
+    await wait(2500);
+    const failToast = await js(`document.getElementById('toast').textContent`);
+    say('      toast=' + failToast);
+    if (/换一批失败/.test(failToast)) ok('明确提示失败：' + failToast);
+    else bad('失败时没有提示：' + failToast);
+    const stillThere = await js(`document.querySelectorAll('#guessList .song-row').length`);
+    if (stillThere === FAKE.length) ok('失败后原来的推荐还在（没有被清空）');
+    else bad('失败后列表被清掉了：' + stillThere);
+    guessMode = 'songs';
   } catch (e) {
     bad('异常 ' + (e && e.stack ? e.stack : e));
   }
