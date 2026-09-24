@@ -550,14 +550,18 @@ async function playQueueIndex(i) {
 function nextSong(auto = false) {
   if (!state.queue.length) return;
   let i;
-  if (state.mode === 'random') {
+  if (auto && state.mode === 'single') {
+    // 单曲循环：自动切歌（也就是播完）时原地重播当前这首。
+    // 这一支必须放在最前面 —— 它原本嵌在下面的「队列绕回」分支里，
+    // 只有播到最后一首才会走到，中间的歌播完照样往后跳，
+    // 表现出来就是「单曲循环没效果」。
+    // 手动点「下一首」不走这里：用户主动切歌就该真的切走。
+    i = state.qIndex;
+  } else if (state.mode === 'random') {
     i = Math.floor(Math.random() * state.queue.length);
   } else {
     i = state.qIndex + 1;
-    if (i >= state.queue.length) {
-      if (auto && state.mode === 'single') i = state.qIndex;
-      else i = 0;
-    }
+    if (i >= state.queue.length) i = 0;
   }
   playQueueIndex(i);
 }

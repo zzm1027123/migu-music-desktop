@@ -143,6 +143,78 @@ app.whenReady().then(async () => {
     const back = JSON.parse(await iconNow());
     if (back.html === list0.html && /列表循环/.test(back.title)) ok('三个模式循环切换正常');
     else bad('循环切换后没有回到列表循环');
+
+    // ---------- 实际切歌行为 ----------
+    // 图标对了不等于模式生效。这里真的放一首歌、真的触发「播完」，
+    // 看它到底有没有按模式切 —— 之前「单曲循环没效果」就是漏了这一层。
+    say('\n[7] 先放一首歌，作为后续判断的基准');
+    await js(
+      `(()=>{const r=document.querySelector('.song-row'); r.dispatchEvent(new MouseEvent('dblclick',{bubbles:true})); return 1})()`
+    );
+    await wait(7000);
+    const base = JSON.parse(
+      await js(`JSON.stringify({
+        name: document.getElementById('nowName').textContent,
+        playing: !document.getElementById('audio').paused
+      })`)
+    );
+    say('      ' + JSON.stringify(base));
+    if (base.playing) ok('已开始播放：' + base.name);
+    else bad('没能开始播放，后面的模式判断不可靠');
+
+    const ended = () => js(`document.getElementById('audio').dispatchEvent(new Event('ended'))`);
+    const nowPlaying = () =>
+      js(`JSON.stringify({
+        name: document.getElementById('nowName').textContent,
+        time: document.getElementById('audio').currentTime,
+        playing: !document.getElementById('audio').paused
+      })`);
+
+    say('\n[8] 单曲循环：播完应当重播同一首');
+    await js(`document.getElementById('modeBtn').click()`); // list -> single
+    await wait(500);
+    say('      当前模式：' + (await js(`document.getElementById('modeBtn').title`)));
+    await ended();
+    await wait(7000);
+    const afterSingle = JSON.parse(await nowPlaying());
+    say('      播完后：' + JSON.stringify(afterSingle));
+    if (afterSingle.name === base.name) ok(`仍停在同一首「${afterSingle.name}」（单曲循环生效）`);
+    else bad(`单曲循环没生效：从「${base.name}」跳到了「${afterSingle.name}」`);
+    if (afterSingle.time < 10) ok(`播放进度已从头开始（${afterSingle.time.toFixed(1)}s）`);
+    else bad('进度没有重置：' + afterSingle.time);
+    if (afterSingle.playing) ok('仍在播放');
+    else bad('重播后没有继续播放');
+
+    say('\n[9] 列表循环：播完应当跳到下一首');
+    await js(`document.getElementById('modeBtn').click()`); // single -> random
+    await wait(300);
+    await js(`document.getElementById('modeBtn').click()`); // random -> list
+    await wait(500);
+    say('      当前模式：' + (await js(`document.getElementById('modeBtn').title`)));
+    await ended();
+    await wait(7000);
+    const afterList = JSON.parse(await nowPlaying());
+    say('      播完后：' + JSON.stringify(afterList));
+    if (afterList.name !== afterSingle.name)
+      ok(`切到了下一首：「${afterSingle.name}」→「${afterList.name}」`);
+    else bad(`列表循环没有切歌，仍停在「${afterList.name}」`);
+
+    say('\n[10] 随机播放：播完应继续播放，不能卡住');
+    await js(`document.getElementById('modeBtn').click()`); // list -> single
+    await wait(300);
+    await js(`document.getElementById('modeBtn').click()`); // single -> random
+    await wait(500);
+    say('      当前模式：' + (await js(`document.getElementById('modeBtn').title`)));
+    await ended();
+    await wait(7000);
+    const afterRandom = JSON.parse(await nowPlaying());
+    say('      播完后：' + JSON.stringify(afterRandom));
+    if (afterRandom.playing) ok('随机播放继续在放：' + afterRandom.name);
+    else bad('随机播放卡住了');
+
+    // 恢复成默认的列表循环，免得留下奇怪的设置
+    await js(`document.getElementById('modeBtn').click()`); // random -> list
+    await wait(400);
   } catch (e) {
     bad('异常 ' + (e && e.stack ? e.stack : e));
   }
