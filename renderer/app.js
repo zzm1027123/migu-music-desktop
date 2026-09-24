@@ -1285,6 +1285,26 @@ function bindUi() {
     }
   });
 
+  // 清除缓存：只清可再生的页面/图片缓存，登录态、歌单、设置都不动
+  $('#cleanCacheBtn').addEventListener('click', async () => {
+    const yes = await askConfirm(
+      '清除缓存',
+      '会清掉页面与图片缓存，之后打开这些页面要重新下载、可能稍慢一点。登录状态、歌单和设置都不受影响。',
+      '清除'
+    );
+    if (!yes) return;
+    try {
+      const r = await window.migu.cacheClear();
+      await refreshCacheStats();
+      let msg = r && r.freed > 0 ? `已清除缓存，释放 ${fmtSize(r.freed)}` : '缓存已经是干净的';
+      // 还有明显残留说明文件正被占用，如实说明，不假装清干净了
+      if (r && r.pending > 1024 * 1024) msg += `；另有 ${fmtSize(r.pending)} 使用中，重启后释放`;
+      toast(msg, 4600);
+    } catch (e) {
+      toast('清除缓存失败：' + (e.message || e), 3600);
+    }
+  });
+
   // audio 事件
   audio.addEventListener('play', () => setPlayIcon(true));
   audio.addEventListener('pause', () => setPlayIcon(false));
@@ -1904,6 +1924,19 @@ async function refreshLogStats() {
   }
 }
 
+/** 刷新「清除缓存」那一行的说明文字 */
+async function refreshCacheStats() {
+  const el = $('#cacheStatsText');
+  if (!el) return;
+  try {
+    const st = await window.migu.cacheStats();
+    el.textContent = `页面与图片缓存，当前占用 ${fmtSize(st.bytes)}；清除不会退出登录`;
+    el.title = st.dir || '';
+  } catch {
+    el.textContent = '统计失败';
+  }
+}
+
 /**
  * 应用界面主题。
  * 深色是默认值（写在 :root 里），所以只在浅色时挂 data-theme="light"。
@@ -2000,6 +2033,7 @@ async function openSettings() {
     }
   } catch {}
   await refreshLogStats();
+  await refreshCacheStats();
   await refreshCredHint();
   $('#settingsMask').classList.add('show');
 }

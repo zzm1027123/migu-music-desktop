@@ -100,4 +100,8 @@ contextBridge.exposeInMainWorld('migu', {
   logPath: () => ipcRenderer.invoke('log:path'),
   logStats: () => ipcRenderer.invoke('log:stats'),
   logClean: (days) => ipcRenderer.invoke('log:clean', days),
+
+  // 运行时缓存（只清可再生部分，不会动登录态）
+  cacheStats: () => ipcRenderer.invoke('cache:stats'),
+  cacheClear: () => ipcRenderer.invoke('cache:clear'),
 });

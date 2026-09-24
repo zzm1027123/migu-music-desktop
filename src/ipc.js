@@ -7,6 +7,7 @@ const api = require('./migu-api');
 const resolver = require('./resolver');
 const playlist = require('./playlist');
 const logger = require('./logger');
+const cache = require('./cache');
 
 /**
  * @param {object} ctx
@@ -132,6 +133,10 @@ function registerIpc(ctx) {
   ipcMain.handle('log:path', () => ({ file: logger.getFile() || '', dir: logger.getDir() || '' }));
   ipcMain.handle('log:stats', () => logger.stats());
   ipcMain.handle('log:clean', (_e, days) => logger.cleanOlderThan(days));
+
+  // 运行时缓存（只清可再生部分，边界说明见 src/cache.js）
+  ipcMain.handle('cache:stats', () => cache.stats());
+  ipcMain.handle('cache:clear', () => cache.clear());
 }
 
 module.exports = { registerIpc };

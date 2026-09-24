@@ -14,6 +14,7 @@
     "test:single": "powershell -ExecutionPolicy Bypass -File test-single-instance.ps1",
     "test:log": "electron test-log.js",
     "test:log-clean": "electron test-log-clean.js",
+    "test:cache": "electron test-cache.js",
     "test:suggest": "electron test-suggest.js",
     "test:playlist": "electron test-playlist.js",
     "test:remove": "electron test-remove.js",
