@@ -40,11 +40,18 @@ let lastError = '';
  * 服务端一律回「请先登录」（注意不是"token 无效"，是压根没带）。
  *
  * 我们已经在票据加固那一层保住了 cookie 里的 pacmtoken，这里把它同步回
- * localStorage；值变了就重载一次页面，让 SDK 用新 token 重新初始化。
+ * localStorage。
+ *
+ * 关于 reload：页面重载能逼 SDK 用新 token 重新初始化，但重载之后
+ * `window.__miguHttp` 就没了 —— 所以重载完必须把 ready 置回 false，
+ * 否则后续请求会打在一个没有 SDK 的页面上，报
+ * 「Cannot read properties of undefined (reading 'get')」。
+ * 运行时（保活）同步一律传 reload:false，避免重载打断正在进行的请求。
  *
  * @returns {Promise<'same'|'set'|'none'|'error'>}
  */
-async function restorePacToken(w) {
+async function restorePacToken(w, opts = {}) {
+  const reload = opts.reload !== false;
   try {
     const cookies = await session.defaultSession.cookies.get({ name: 'pacmtoken' });
     const c = (cookies || []).find((x) => x.value && x.value.length > 12);
@@ -60,6 +67,10 @@ async function restorePacToken(w) {
     })()`;
     const r = await w.webContents.executeJavaScript(js, true);
     if (r === 'set') {
+      if (!reload) {
+        logger.info('[解析器] 已把 pacmtoken 写入页面 localStorage（本次不重载，下次打开页面生效）');
+        return r;
+      }
       logger.info('[解析器] 已把 cookie 里的 pacmtoken 补回页面 localStorage，重载页面让 SDK 重新初始化');
       const done = new Promise((resolve) => {
         w.webContents.once('did-finish-load', resolve);
@@ -67,6 +78,8 @@ async function restorePacToken(w) {
       });
       w.webContents.reload();
       await done;
+      // 关键：重载带走了 window.__miguHttp，标记未就绪，下次调用会重新探测
+      if (win === w) ready = false;
     }
     return r;
   } catch (e) {
@@ -76,9 +89,9 @@ async function restorePacToken(w) {
 }
 
 /** 对外的便捷入口：窗口还活着就把 pacmtoken 同步一次 */
-async function syncPacToken() {
+async function syncPacToken(opts = {}) {
   if (!alive()) return 'none';
-  return restorePacToken(win);
+  return restorePacToken(win, opts);
 }
 
 /** 诊断用：页面里 pacmtoken 的现状 */
@@ -177,7 +190,9 @@ async function boot() {
     booting = null;
     throw e;
   } finally {
-    if (ready) booting = null;
+    // 无条件清空：如果这里因为 ready 为 false 而留着旧 promise，
+    // 后面 ready 被置回 false（比如页面重载）时就再也 boot 不起来了
+    booting = null;
   }
 }
 
@@ -253,7 +268,7 @@ async function resolvePlayUrl(song, tone = 'PQ') {
  * 咪咕的用户类接口（歌单、收藏等）依赖客户端自动注入的 uid / token 等 header，
  * 直接用自己的 net 请求会返回「请先登录」，所以统一走这里。
  */
-async function webCall(pathname, params = {}, method = 'get') {
+async function webCall(pathname, params = {}, method = 'get', _retry = 0) {
   try {
     await boot();
   } catch (e) {
@@ -270,7 +285,23 @@ async function webCall(pathname, params = {}, method = 'get') {
     }
   })()`;
   try {
-    return JSON.parse(await win.webContents.executeJavaScript(js, true));
+    const out = JSON.parse(await win.webContents.executeJavaScript(js, true));
+    /*
+     * 页面重载过（比如 pacmtoken 更新触发的）会让 window.__miguHttp 消失，
+     * 这时所有请求都会报「Cannot read properties of undefined」。
+     * 重新探测一次 SDK 再重试，别把这种一次性的状态问题甩给用户。
+     */
+    if (!out.ok && /Cannot read propert|__miguHttp/.test(String(out.err || '')) && _retry < 1) {
+      logger.warn('[解析器] SDK 变量丢失（页面可能刚重载过），重新探测后重试');
+      ready = false;
+      try {
+        await boot();
+      } catch (e) {
+        return { ok: false, err: '解析器重新初始化失败：' + ((e && e.message) || e) };
+      }
+      return webCall(pathname, params, method, _retry + 1);
+    }
+    return out;
   } catch (e) {
     return { ok: false, err: String((e && e.message) || e) };
   }

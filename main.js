@@ -922,8 +922,10 @@ async function keepAliveOnce(reason) {
     const r = await resolver.webCall('/pc/user/home-page/v2.0');
     if (r && r.res && r.res.code === '000000') {
       const hard = await persistLoginTickets(session.defaultSession, 30, { force: true });
-      // 页面里的 token 可能被清过，顺手补回 localStorage；cookie 也存一份备份
-      await resolver.syncPacToken().catch(() => {});
+      // 页面里的 token 可能被清过，顺手补回 localStorage。
+      // 这里**不重载页面** —— 重载会打断正在进行的请求，也会让 SDK 变量失效；
+      // 写进去下次页面初始化时自然生效。
+      await resolver.syncPacToken({ reload: false }).catch(() => {});
       await backupPacTokenNow();
       if (hard.extended) logger.info(`[登录] 保活成功（${reason}），票据有效期已延长 ${hard.extended} 个`);
     } else {
