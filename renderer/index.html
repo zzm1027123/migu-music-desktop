@@ -168,6 +168,17 @@
 
         <div class="set-row">
           <div class="set-label">
+            <b>自动登录</b>
+            <span id="credHint">登录失效时自动用保存的账号密码重新登录一次。密码经系统加密后存在本机，不会明文保存。</span>
+          </div>
+          <div class="log-actions">
+            <button class="btn-ghost small" id="credSetBtn">设置账号</button>
+            <button class="btn-ghost small danger" id="credClearBtn">清除</button>
+          </div>
+        </div>
+
+        <div class="set-row">
+          <div class="set-label">
             <b>界面主题</b>
             <span>浅色模式在白天或亮环境下更舒服，立即生效并记住选择</span>
           </div>
@@ -276,6 +287,28 @@
         <div class="new-pl-actions">
           <button class="btn-ghost" id="confirmCancel">取消</button>
           <button class="btn-primary" id="confirmOk">确定</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自动登录账号设置 -->
+  <div class="modal-mask" id="credMask">
+    <div class="modal pl-modal">
+      <div class="modal-head">
+        <b>自动登录账号</b>
+        <button class="icon-btn" id="credClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="new-pl-hint">
+          咪咕的登录会话只有几小时有效，关掉客户端久了就会失效。存下账号密码后，失效时客户端会自动重新登录一次。
+          <br />密码用 Windows 系统加密后保存在本机（绑定当前 Windows 用户），不会明文落盘、也不会上传。
+        </div>
+        <input class="new-pl-input" id="credUser" placeholder="手机号 / 邮箱 / 用户名" autocomplete="off" />
+        <input class="new-pl-input" id="credPass" type="password" placeholder="密码" autocomplete="off" />
+        <div class="new-pl-actions">
+          <button class="btn-ghost" id="credCancel">取消</button>
+          <button class="btn-primary" id="credOk">保存</button>
         </div>
       </div>
     </div>

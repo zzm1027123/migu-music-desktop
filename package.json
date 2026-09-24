@@ -24,6 +24,8 @@
     "test:playable": "electron test-playable.js",
     "test:ticket": "electron test-ticket-persist.js",
     "test:login-sync": "electron test-login-sync.js",
+    "test:cred": "electron test-credentials.js",
+    "test:pactoken": "electron test-pactoken-sync.js",
     "check:cookies": "electron check-cookies.js",
     "icons": "node make-icons.mjs",
     "selftest": "electron selftest.js",

@@ -1168,6 +1168,20 @@ function bindUi() {
   $('#confirmMask').addEventListener('click', (e) => {
     if (e.target === $('#confirmMask')) closeConfirm(false);
   });
+
+  // 自动登录账号
+  $('#credSetBtn').addEventListener('click', openCredDialog);
+  $('#credClearBtn').addEventListener('click', clearCred);
+  $('#credOk').addEventListener('click', submitCred);
+  const closeCred = () => $('#credMask').classList.remove('show');
+  $('#credClose').addEventListener('click', closeCred);
+  $('#credCancel').addEventListener('click', closeCred);
+  $('#credMask').addEventListener('click', (e) => {
+    if (e.target === $('#credMask')) closeCred();
+  });
+  $('#credPass').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') submitCred();
+  });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && $('#confirmMask').classList.contains('show')) closeConfirm(false);
   });
@@ -1847,6 +1861,65 @@ function applyTheme(theme) {
   if (sel) sel.value = t;
 }
 
+/* --------------------------------------------------- 自动登录账号 */
+
+async function refreshCredHint() {
+  const el = $('#credHint');
+  if (!el) return;
+  try {
+    const st = await window.migu.credStatus();
+    if (!st.supported) {
+      el.textContent = '本机不支持系统加密存储，为安全起见不保存密码。';
+      return;
+    }
+    el.textContent = st.hasSaved
+      ? `已保存账号：${st.username}（密码经系统加密存在本机）。登录失效时会自动重新登录。`
+      : '登录失效时自动用保存的账号密码重新登录一次。密码经系统加密后存在本机，不会明文保存。';
+  } catch {}
+}
+
+async function openCredDialog() {
+  try {
+    const st = await window.migu.credStatus();
+    if (!st.supported) return toast('本机不支持系统加密存储，无法安全保存密码', 4000);
+    $('#credUser').value = st.username || '';
+    $('#credPass').value = '';
+  } catch {}
+  $('#credMask').classList.add('show');
+  setTimeout(() => $('#credUser').focus(), 60);
+}
+
+async function submitCred() {
+  const u = $('#credUser').value.trim();
+  const p = $('#credPass').value;
+  if (!u || !p) return toast('账号和密码都要填');
+  const btn = $('#credOk');
+  btn.disabled = true;
+  btn.textContent = '保存中…';
+  try {
+    const r = await window.migu.credSave(u, p);
+    if (r && r.ok) {
+      $('#credPass').value = '';
+      $('#credMask').classList.remove('show');
+      toast('已保存，登录失效时会自动重新登录', 3200);
+      await refreshCredHint();
+    } else {
+      toast('保存失败：' + ((r && r.error) || '未知错误'), 3600);
+    }
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '保存';
+  }
+}
+
+async function clearCred() {
+  const yes = await askConfirm('清除自动登录账号', '清除之后，登录失效时就需要你自己手动登录了。', '清除');
+  if (!yes) return;
+  await window.migu.credClear();
+  toast('已清除保存的账号密码');
+  await refreshCredHint();
+}
+
 async function openSettings() {
   try {
     const s = await window.migu.settings.get();
@@ -1868,6 +1941,7 @@ async function openSettings() {
     }
   } catch {}
   await refreshLogStats();
+  await refreshCredHint();
   $('#settingsMask').classList.add('show');
 }
 

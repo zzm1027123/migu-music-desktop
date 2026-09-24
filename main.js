@@ -26,6 +26,7 @@ logger.init(USER_DATA);
 
 // 设置也要在日志清理之前就绪（保留天数从这里读）
 const settings = require('./src/settings');
+const credentials = require('./src/credentials');
 const {
   LOGIN_TICKET_NAMES,
   persistLoginTickets,
@@ -676,6 +677,140 @@ async function checkAuth() {
   return { ...authState };
 }
 
+/* --------------------------------------------------------- 自动登录 */
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** 在登录页里切到「密码登录」并填入账号密码；返回诊断信息 */
+function fillPasswordFormJs(username, password) {
+  return `(() => {
+    const out = { switched: '', user: false, pass: false, captcha: false };
+    for (const el of document.querySelectorAll('button,a,div,span,li')) {
+      if (el.children.length) continue;
+      const t = (el.innerText || '').trim();
+      if (t === '密码登录' && el.offsetParent !== null) { el.click(); out.switched = 'clicked'; break; }
+    }
+    const setVal = (el, v) => {
+      if (!el) return false;
+      try {
+        const d = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value');
+        d.set.call(el, v);
+      } catch (e) { el.value = v; }
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      return true;
+    };
+    out.user = setVal(document.getElementById('J_AccountPsd'), ${JSON.stringify(username)});
+    out.pass = setVal(document.getElementById('J_PasswordPsd'), ${JSON.stringify(password)});
+    const cap = document.getElementById('J_ImgCodePsd');
+    out.captcha = !!(cap && cap.offsetParent !== null);
+    return JSON.stringify(out);
+  })()`;
+}
+
+/** 在登录页里点提交 */
+const submitLoginJs = `(() => {
+  const acc = document.getElementById('J_AccountPsd');
+  const form = acc ? acc.closest('form') : null;
+  const btn = form ? form.querySelector('button[type="submit"],input[type="submit"]') : null;
+  if (btn && btn.offsetParent !== null) { btn.click(); return 'clicked-button'; }
+  const anySubmit = document.querySelector('input[type="submit"],button[type="submit"]');
+  if (anySubmit && anySubmit.offsetParent !== null) { anySubmit.click(); return 'clicked-any'; }
+  if (form) { form.submit(); return 'form-submit'; }
+  return 'no-submit';
+})()`;
+
+/**
+ * 用保存的账号密码自动登录。
+ *
+ * 背景：咪咕的服务端会话只有几小时有效期，客户端关久了必然失效 —— 这一层改不动。
+ * 与其继续对抗它的会话策略，不如在失效时自动重新登录一次。
+ *
+ * 全程走隐藏窗口，不打扰用户；一旦遇到图形验证码之类需要人工介入的情况就放弃，
+ * 交给调用方弹出可见的登录窗口。
+ */
+async function tryAutoLogin() {
+  const cred = credentials.load(LOGIN_DIR);
+  if (!cred) return { ok: false, reason: '没有保存账号密码' };
+  if (loginWindow && !loginWindow.isDestroyed()) return { ok: false, reason: '登录窗口已打开' };
+  if (!credentials.available()) return { ok: false, reason: '本机不支持系统加密存储' };
+
+  logger.info('[自动登录] 用保存的账号尝试自动登录…');
+  const before = await snapshotCookies();
+  loginBeforeKeys = new Set(before.map((c) => c.name + '@' + c.domain));
+
+  const w = new BrowserWindow({
+    show: false,
+    width: 480,
+    height: 700,
+    title: '自动登录',
+    webPreferences: { contextIsolation: true, nodeIntegration: false },
+  });
+
+  try {
+    await w.loadURL(LOGIN_URL);
+    await sleep(4500);
+
+    const filled = JSON.parse(await w.webContents.executeJavaScript(fillPasswordFormJs(cred.username, cred.password), true));
+    logger.info(
+      `[自动登录] 切到密码登录=${filled.switched || '未找到'} 账号=${filled.user ? '已填' : '失败'} 密码=${
+        filled.pass ? '已填' : '失败'
+      } 图形验证码=${filled.captcha ? '出现（无法自动完成）' : '无'}`
+    );
+    if (!filled.user || !filled.pass) {
+      w.destroy();
+      return { ok: false, reason: '登录页结构可能变了，没能填进账号密码' };
+    }
+    if (filled.captcha) {
+      w.destroy();
+      return { ok: false, reason: '需要图形验证码', needManual: true, username: cred.username };
+    }
+
+    const how = await w.webContents.executeJavaScript(submitLoginJs, true);
+    logger.info('[自动登录] 已提交（' + how + '）');
+
+    const t0 = Date.now();
+    while (Date.now() - t0 < 25000) {
+      await sleep(1200);
+      if (!w || w.isDestroyed()) break;
+      const now = await snapshotCookies();
+      const added = now.filter((c) => !loginBeforeKeys.has(c.name + '@' + c.domain) && c.valueLen > 12);
+      const meaningful = added.filter((c) => !/uem|device|uuid|cookieId|task-session|logId|^gsm/i.test(c.name));
+      if (meaningful.length) {
+        authState.loggedIn = true;
+        authState.since = Date.now();
+        authState.cookieKeys = now.map((c) => c.name + '@' + c.domain);
+        await persistLoginTickets(session.defaultSession, 30, { force: true }).catch(() => {});
+        await backupPacTokenNow();
+        saveAuthFile();
+        logger.info('[自动登录] 成功（新增 Cookie：' + meaningful.map((c) => c.name).join(',') + '）');
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('auth:changed', { ...authState, reason: 'auto' });
+        }
+        try {
+          w.destroy();
+        } catch {}
+        return { ok: true };
+      }
+    }
+    try {
+      w.destroy();
+    } catch {}
+    return {
+      ok: false,
+      reason: '提交后迟迟没拿到登录态（可能要验证码或触发了风控）',
+      needManual: true,
+      username: cred.username,
+    };
+  } catch (e) {
+    try {
+      if (!w.isDestroyed()) w.destroy();
+    } catch {}
+    logger.warn('[自动登录] 异常：' + ((e && e.message) || e));
+    return { ok: false, reason: (e && e.message) || String(e) };
+  }
+}
+
 /* ------------------------------------------------------------------ IPC */
 
 const ipcContext = {
@@ -701,6 +836,15 @@ const ipcContext = {
     isQuitting = true;
     app.quit();
   },
+  // 自动登录用的账号密码（加密存在本机，详见 src/credentials.js）
+  credStatus: () => ({
+    supported: credentials.available(),
+    hasSaved: credentials.exists(LOGIN_DIR),
+    username: credentials.peekUsername(LOGIN_DIR),
+  }),
+  credSave: (_e, username, password) => credentials.save(LOGIN_DIR, username, password),
+  credClear: () => ({ ok: credentials.clear(LOGIN_DIR) }),
+  credLoginNow: () => tryAutoLogin(),
   lyricToggle: () => toggleLyricWindow(),
   lyricClose: () => {
     const r = lyricWin.close();
@@ -821,7 +965,14 @@ app.whenReady().then(async () => {
   lyricWin.setOnClosed(() => {
     notifyLyricChanged();
   });
-  checkAuth();
+  checkAuth().then((st) => {
+    // 启动时如果是未登录状态、且存过账号密码，就悄悄自动登录一次
+    if (st && !st.loggedIn && credentials.exists(LOGIN_DIR)) {
+      tryAutoLogin().then((r) => {
+        if (!r.ok) logger.info('[自动登录] 未成功：' + r.reason);
+      });
+    }
+  });
   startSessionKeepAlive();
   // 启动时记一笔票据清单：以后排查「登录态为什么没了」，
   // 一眼就能看出关键票据（尤其 pacmtoken）在不在、还剩多久

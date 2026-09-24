@@ -746,6 +746,7 @@ input[type="range"]::-webkit-slider-thumb {
   padding: 9px 11px; font-size: 13.5px; outline: none;
 }
 .new-pl-input:focus { border-color: var(--brand); }
+.new-pl-input + .new-pl-input { margin-top: 8px; }
 .new-pl-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
 /* .btn-ghost 默认是 flex:1（给设置面板两个按钮平分用的），这里要恢复自然宽度 */
 .new-pl-actions .btn-ghost { flex: none; padding: 0 18px; border-radius: 999px; }

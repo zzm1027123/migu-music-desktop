@@ -89,6 +89,12 @@ function registerIpc(ctx) {
   ipcMain.handle('auth:status', () => ctx.getAuthState());
   ipcMain.handle('auth:confirm', () => (ctx.confirmLogin ? ctx.confirmLogin() : { ok: false }));
 
+  // 自动登录用的账号密码（加密存在本机）
+  ipcMain.handle('cred:status', () => (ctx.credStatus ? ctx.credStatus() : { supported: false, hasSaved: false }));
+  ipcMain.handle('cred:save', (_e, u, p) => (ctx.credSave ? ctx.credSave(_e, u, p) : { ok: false }));
+  ipcMain.handle('cred:clear', () => (ctx.credClear ? ctx.credClear() : { ok: false }));
+  ipcMain.handle('cred:loginNow', () => (ctx.credLoginNow ? ctx.credLoginNow() : { ok: false }));
+
   // 其它
   ipcMain.handle('app:openExternal', (_e, url) => {
     if (/^https?:/.test(url)) shell.openExternal(url);

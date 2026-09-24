@@ -32,6 +32,12 @@ contextBridge.exposeInMainWorld('migu', {
   logout: () => ipcRenderer.invoke('auth:logout'),
   authStatus: () => ipcRenderer.invoke('auth:status'),
   confirmLogin: () => ipcRenderer.invoke('auth:confirm'),
+
+  // 自动登录用的账号密码（加密存在本机）
+  credStatus: () => ipcRenderer.invoke('cred:status'),
+  credSave: (username, password) => ipcRenderer.invoke('cred:save', username, password),
+  credClear: () => ipcRenderer.invoke('cred:clear'),
+  credLoginNow: () => ipcRenderer.invoke('cred:loginNow'),
   onAuthChanged: (cb) => {
     const h = (_e, payload) => cb(payload);
     ipcRenderer.on('auth:changed', h);
