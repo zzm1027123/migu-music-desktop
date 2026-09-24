@@ -107,14 +107,16 @@ async function markRestricted(container, songs) {
   }
   const ids = songs.map((s) => s.contentId).filter(Boolean).slice(0, 60);
   if (!ids.length) return;
-  const token = ++markToken;
+  // 每个容器各自计数：首页现在同时挂着「今日推荐」和「猜你喜欢」两个列表，
+  // 用全局计数的话后发的请求会把先前的顶掉，先来的那个列表就永远标不上
+  const token = (container.__markToken = (container.__markToken || 0) + 1);
   let map = {};
   try {
     map = await window.migu.canListen(ids);
   } catch {
     return;
   }
-  if (token !== markToken || !document.body.contains(container)) return;
+  if (container.__markToken !== token || !document.body.contains(container)) return;
 
   container.querySelectorAll('.song-row').forEach((row) => {
     const s = songs[Number(row.dataset.i)];
@@ -190,7 +192,12 @@ async function renderHome() {
   setNav('home');
   view.innerHTML = loadingHtml('正在加载推荐内容…');
   try {
-    const [today, ranks] = await Promise.all([window.migu.today(), window.migu.ranks()]);
+    const [today, ranks, guess] = await Promise.all([
+      window.migu.today(),
+      window.migu.ranks(),
+      // 猜你喜欢要登录，取不到也不能拖垮整个首页 —— 所以自己吞掉异常
+      window.migu.guessYouLike(30).catch(() => null),
+    ]);
     state.ranks = ranks || [];
 
     let html = '';
@@ -198,6 +205,16 @@ async function renderHome() {
       html += `<div class="page-title">今日推荐</div>
         <div class="page-sub">${esc(today.date || '')} · 共 ${today.songs.length} 首 · 点击任意歌曲开始播放</div>`;
       html += `<div class="section-title">歌曲列表</div><div class="song-list" id="todayList">${songRowsHtml(today.songs)}</div>`;
+    }
+
+    // 猜你喜欢（咪咕那边叫「私人FM」，基于收听口味）
+    const guessSongs = guess && guess.ok && guess.songs ? guess.songs : [];
+    if (guessSongs.length) {
+      html += `<div class="section-title">猜你喜欢</div>
+        <div class="page-sub">根据你的收听口味推荐 · 共 ${guessSongs.length} 首</div>`;
+      html += `<div class="song-list" id="guessList">${songRowsHtml(guessSongs)}</div>`;
+    } else if (guess && guess.needLogin) {
+      html += `<div class="section-title">猜你喜欢</div>` + emptyHtml('登录后这里会出现为你推荐的歌曲');
     }
 
     if (state.ranks.length) {
@@ -221,6 +238,9 @@ async function renderHome() {
 
     const tl = $('#todayList');
     if (tl) bindSongList(tl, today.songs);
+
+    const gl = $('#guessList');
+    if (gl && guessSongs.length) bindSongList(gl, guessSongs);
 
     view.querySelectorAll('.card[data-rank]').forEach((c) =>
       c.addEventListener('click', () => renderRankDetail(c.dataset.rank))

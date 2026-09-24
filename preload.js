@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('migu', {
   rankSongs: (rankId) => ipcRenderer.invoke('migu:rankSongs', rankId),
   column: (id) => ipcRenderer.invoke('migu:column', id),
   today: () => ipcRenderer.invoke('migu:today'),
+  guessYouLike: (limit) => ipcRenderer.invoke('migu:guessYouLike', limit),
 
   // 播放
   songUrl: (song, opts) => ipcRenderer.invoke('migu:songUrl', song, opts),

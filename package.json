@@ -27,6 +27,7 @@
     "test:cred": "electron test-credentials.js",
     "test:pactoken": "electron test-pactoken-sync.js",
     "test:reload": "electron test-resolver-reload.js",
+    "test:guess": "electron test-guess.js",
     "check:cookies": "electron check-cookies.js",
     "icons": "node make-icons.mjs",
     "selftest": "electron selftest.js",

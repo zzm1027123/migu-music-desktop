@@ -24,6 +24,7 @@ function registerIpc(ctx) {
   ipcMain.handle('migu:rankSongs', (_e, rankId) => api.rankSongs(rankId));
   ipcMain.handle('migu:column', (_e, id) => api.columnInfo(id));
   ipcMain.handle('migu:today', () => api.todayRecommend());
+  ipcMain.handle('migu:guessYouLike', (_e, limit) => api.guessYouLike(limit));
 
   // 播放：优先用网页版 SDK（自带登录态，会员权益可生效），失败再退回 App 端接口
   ipcMain.handle('migu:songUrl', async (_e, song, opts) => {

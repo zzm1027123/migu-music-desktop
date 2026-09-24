@@ -7,9 +7,11 @@
  *  - 榜单歌曲  app.c.nf.migu.cn     pc/bmw/rank/rank-info/v1.0
  *  - 歌单      app.c.nf.migu.cn     column/column-info/h5/v2.0
  *  - 今日推荐  app.c.nf.migu.cn     pc/v1.0/template/todayRecommendList/release
+ *  - 猜你喜欢  app.c.nf.migu.cn     pc/resource-dataloader/recommend-song/v1.0（私人FM，需登录）
  *  - 歌曲详情  app.c.nf.migu.cn     MIGUM3.0/resource/song/by-songids/v2.0
  *  - 播放地址  app.pd.nf.migu.cn    MIGUM2.0/v1.0/content/sub/listenSong.do （302 跳转真实音频）
  */
+const logger = require('./logger');
 // 在 Electron 主进程中使用 net（自动携带登录 Cookie）；
 // 在纯 Node 环境下回退到全局 fetch，便于命令行自检。
 let electronNet = null;
@@ -347,6 +349,70 @@ async function todayRecommend() {
   };
 }
 
+/* ------------------------------------------- 猜你喜欢（咪咕叫「私人FM」） */
+
+/**
+ * 个性化推荐歌曲 —— 界面上叫「猜你喜欢」。
+ *
+ * 咪咕并没有一个叫「猜你喜欢」的板块，对应的能力是**私人FM**：
+ *   GET /pc/resource-dataloader/recommend-song/v1.0
+ *       ?scene=PRIVATE_FM&algorithm=v1&action=2
+ * 返回 data.songItemList。这个是**要登录**的（网页版里前面就挡了一次 checkLogin），
+ * 所以走 resolver 的用户态通道，而不是裸请求。
+ */
+async function guessYouLike(limit = 30) {
+  const resolver = require('./resolver'); // 惰性引入，避免模块初始化顺序上的纠缠
+  const r = await resolver.webCall('/pc/resource-dataloader/recommend-song/v1.0', {
+    scene: 'PRIVATE_FM',
+    algorithm: 'v1',
+    action: '2',
+  });
+  const res = r && r.res;
+  if (!r || !r.ok || !res || res.code !== '000000') {
+    const code = String((res && res.code) || '');
+    const info = (res && res.info) || r.err || '获取推荐失败';
+    const needLogin = code === '290001' || /请先登录|未登录|参数校验失败|USER_NOT_LOGIN/.test(info);
+    if (needLogin) logger.info('[猜你喜欢] 需要登录后才能取个性化推荐');
+    else logger.warn(`[猜你喜欢] 获取失败：${code} ${info}`);
+    return {
+      ok: false,
+      needLogin,
+      error: needLogin ? '登录后这里会出现为你推荐的歌曲' : info,
+      songs: [],
+    };
+  }
+
+  const list = (res.data && (res.data.songItemList || res.data.songList)) || [];
+  const songs = list
+    .map((it) => {
+      try {
+        return normalizeSongData(null, {
+          contentId: it.contentId || it.id,
+          songId: it.songId,
+          copyrightId: it.copyrightId,
+          albumId: it.albumId,
+          name: it.songName || it.name,
+          artist:
+            (it.singerList || it.singers || []).map((s) => s.name || s.singerName || '').join('、') ||
+            it.singer ||
+            it.artist ||
+            '',
+          album: it.albumName || it.album || '',
+          cover: it.img || it.img1 || it.cover || it.coverUrl || '',
+          duration: it.duration || 0,
+          lyricUrl: it.lrcUrl || it.mrcUrl || '',
+          vip: (it.downloadTags || []).includes('vip'),
+        });
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+
+  logger.info(`[猜你喜欢] 拿到 ${songs.length} 首个性化推荐`);
+  return { ok: true, songs: songs.slice(0, limit) };
+}
+
 /* --------------------------------------------------------- 播放地址解析 */
 
 const TONE_CHAIN = {
@@ -414,6 +480,7 @@ module.exports = {
   rankSongs,
   columnInfo,
   todayRecommend,
+  guessYouLike,
   songUrl,
   lyric,
   normalizeSongData,
