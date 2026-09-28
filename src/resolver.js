@@ -52,10 +52,42 @@ let lastError = '';
  */
 async function restorePacToken(w, opts = {}) {
   const reload = opts.reload !== false;
+  // 只有调用方明确要求时才丢弃 localStorage 里的旧 token（见下面 cookie 为空的处理）。
+  // 默认 false：保活路径也走这个函数，那里的 localStorage 可能是当前唯一有效的 token。
+  const discardStale = opts.discardStale === true;
   try {
     const cookies = await session.defaultSession.cookies.get({ name: 'pacmtoken' });
     const c = (cookies || []).find((x) => x.value && x.value.length > 12);
-    if (!c) return 'none';
+    if (!c) {
+      // cookie 里没有 pacmtoken。启动时（discardStale）要把 localStorage 里的旧值清掉：
+      // 那多半是上一次留下的残骸，SDK 会继续拿它当身份，而它早就过期了，
+      // 服务端一律回「请先登录」—— 于是「明明刚登录成功，下次启动又是未登录」。
+      // 保活路径不能清：那里的 localStorage 可能就是当前唯一有效的 token。
+      if (!discardStale) return 'none';
+      const js = `(() => {
+        try {
+          if (!localStorage.getItem('mg_auth_pacmtoken')) return 'none';
+          localStorage.removeItem('mg_auth_pacmtoken');
+          return 'cleared';
+        } catch (e) { return 'error'; }
+      })()`;
+      const r = await w.webContents.executeJavaScript(js, true);
+      if (r === 'cleared') {
+        if (!reload) {
+          logger.info('[解析器] 已清掉页面里过期的 pacmtoken（本次不重载，下次打开页面生效）');
+          return r;
+        }
+        logger.info('[解析器] cookie 里没有 pacmtoken，已清掉页面里的旧值，重载让 SDK 重新换取');
+        const done = new Promise((resolve) => {
+          w.webContents.once('did-finish-load', resolve);
+          setTimeout(resolve, 8000);
+        });
+        w.webContents.reload();
+        await done;
+        if (win === w) ready = false;
+      }
+      return r;
+    }
 
     const js = `(() => {
       try {
@@ -92,6 +124,31 @@ async function restorePacToken(w, opts = {}) {
 async function syncPacToken(opts = {}) {
   if (!alive()) return 'none';
   return restorePacToken(win, opts);
+}
+
+/**
+ * 强制让解析器页面重新加载。
+ *
+ * 用于「刚换了一套登录会话」之后：SDK 是拿页面里的 token 发请求的，
+ * 光往 localStorage 写值不会让**已经在跑**的 SDK 换身份 —— 它初始化时就定死了。
+ * 必须重载页面，让它用 Cookie 里的新会话重新走一遍初始化（顺带换到新的 pacmtoken）。
+ */
+async function reboot() {
+  if (!alive()) return false;
+  try {
+    ready = false;
+    const done = new Promise((resolve) => {
+      win.webContents.once('did-finish-load', resolve);
+      setTimeout(resolve, 10000);
+    });
+    win.webContents.reload();
+    await done;
+    logger.info('[解析器] 已强制重载，让 SDK 用最新的登录会话重新初始化');
+    return true;
+  } catch (e) {
+    logger.warn('[解析器] 强制重载失败：' + ((e && e.message) || e));
+    return false;
+  }
 }
 
 /** 诊断用：页面里 pacmtoken 的现状 */
@@ -160,7 +217,9 @@ async function boot() {
       });
       win = w;
       await w.loadURL(PAGE_URL);
-      await restorePacToken(w);
+      // 页面刚打开：这时 cookie 里若没有 pacmtoken，localStorage 里的多半是上一次的
+      // 残骸，清掉它让 SDK 用当前会话重新换一个（保活路径不传这个开关）
+      await restorePacToken(w, { discardStale: true });
     }
 
     // 页面刚加载时 SDK 可能还没在 performance 里登记，重试几次
@@ -359,5 +418,6 @@ module.exports = {
   destroy,
   restorePacToken,
   syncPacToken,
+  reboot,
   pacTokenState,
 };

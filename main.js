@@ -144,6 +144,7 @@ if (alreadyRunning) {
 const api = require('./src/migu-api');
 const { registerIpc } = require('./src/ipc');
 const resolver = require('./src/resolver');
+const playlist = require('./src/playlist');
 const lyricWin = require('./src/lyric-window');
 
 const LOGIN_URL =
@@ -679,10 +680,35 @@ async function checkAuth() {
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/** 在音乐库首页点「登录」入口，让 passport 表单以 iframe 嵌进来 */
+const clickLoginEntryJs = `(() => {
+  try {
+    for (const el of document.querySelectorAll('div,span,a,button,li')) {
+      if (el.children.length) continue;
+      if ((el.innerText || '').trim() === '登录' && el.offsetParent !== null) { el.click(); return 'clicked'; }
+    }
+    return 'no-entry';
+  } catch (e) { return 'err:' + e.message; }
+})()`;
+
+/**
+ * 找出 passport 登录表单所在的 frame。
+ * 表单是嵌在 music.migu.cn 页面里的 iframe，主 frame 上根本找不到那些输入框 ——
+ * 这正是「账号=失败 密码=失败」的原因。
+ */
+function passportFrameOf(w) {
+  const walk = (f, acc = []) => {
+    acc.push(f);
+    (f.frames || []).forEach((x) => walk(x, acc));
+    return acc;
+  };
+  return walk(w.webContents.mainFrame).find((f) => f.url.includes('passport.migu.cn'));
+}
+
 /** 在登录页里切到「密码登录」并填入账号密码；返回诊断信息 */
 function fillPasswordFormJs(username, password) {
   return `(() => {
-    const out = { switched: '', user: false, pass: false, captcha: false };
+    const out = { switched: '', user: false, pass: false, captcha: false, agreed: false };
     for (const el of document.querySelectorAll('button,a,div,span,li')) {
       if (el.children.length) continue;
       const t = (el.innerText || '').trim();
@@ -702,6 +728,20 @@ function fillPasswordFormJs(username, password) {
     out.pass = setVal(document.getElementById('J_PasswordPsd'), ${JSON.stringify(password)});
     const cap = document.getElementById('J_ImgCodePsd');
     out.captcha = !!(cap && cap.offsetParent !== null);
+
+    // 「同意《咪咕用户服务协议》和《咪咕隐私政策》」必须先勾上。
+    // 不勾的话点「登录」是完全没有反应的 —— 前端静默拦截，连一句报错都不给，
+    // 日志里只会留下「提交后迟迟没拿到登录态」，从现象上根本查不出原因。
+    // 真正的 input 被 CSS 藏起来了（offsetParent 为 null），得点它外层的 DIV.protocol。
+    for (const b of document.querySelectorAll('input.J_mobileIsReadPrivacy')) {
+      if (b.checked) { out.agreed = true; break; }
+      const wrap = b.closest('label') || b.parentElement;
+      const txt = wrap ? wrap.innerText || '' : '';
+      if (!/同意|协议/.test(txt)) continue;
+      try { (wrap || b).click(); } catch (e) {}
+      if (!b.checked) { try { b.click(); } catch (e) {} }
+      if (b.checked) { out.agreed = true; break; }
+    }
     return JSON.stringify(out);
   })()`;
 }
@@ -746,34 +786,77 @@ async function tryAutoLogin() {
   });
 
   try {
+    // 必须走「音乐库首页 → 点登录 → 在 passport iframe 里填表」这条真实路径：
+    // 登录成功后要由**父页面**完成业务登录（种下 pacmtoken 等）。
+    // 直接开 passport 页面虽然也能提交成功，但那条回调链走不完，只拿得到 LTToken ——
+    // 业务请求照样被拒，表现就是「这次登录成功，下次启动又是未登录」。
     await w.loadURL(LOGIN_URL);
-    await sleep(4500);
+    await sleep(6000);
 
-    const filled = JSON.parse(await w.webContents.executeJavaScript(fillPasswordFormJs(cred.username, cred.password), true));
+    const entry = await w.webContents.executeJavaScript(clickLoginEntryJs, true);
+    logger.info('[自动登录] 点击登录入口：' + entry);
+
+    let frame = null;
+    const tf = Date.now();
+    while (Date.now() - tf < 12000) {
+      await sleep(800);
+      frame = passportFrameOf(w);
+      if (frame) break;
+    }
+    if (!frame) {
+      try { w.destroy(); } catch {}
+      return { ok: false, reason: '登录表单（passport iframe）没有出现' };
+    }
+    logger.info('[自动登录] 找到登录表单所在的 iframe');
+
+    const filled = JSON.parse(await frame.executeJavaScript(fillPasswordFormJs(cred.username, cred.password), true));
     logger.info(
       `[自动登录] 切到密码登录=${filled.switched || '未找到'} 账号=${filled.user ? '已填' : '失败'} 密码=${
         filled.pass ? '已填' : '失败'
-      } 图形验证码=${filled.captcha ? '出现（无法自动完成）' : '无'}`
+      } 同意协议=${filled.agreed ? '已勾选' : '没勾上'} 图形验证码=${
+        filled.captcha ? '出现（无法自动完成）' : '无'
+      }`
     );
     if (!filled.user || !filled.pass) {
       w.destroy();
       return { ok: false, reason: '登录页结构可能变了，没能填进账号密码' };
+    }
+    if (!filled.agreed) {
+      // 不勾协议点登录是无效的，提前说清楚，省得又只看到一句「迟迟没拿到登录态」
+      logger.warn('[自动登录] 没能勾上「同意用户协议」，这次提交很可能无效');
     }
     if (filled.captcha) {
       w.destroy();
       return { ok: false, reason: '需要图形验证码', needManual: true, username: cred.username };
     }
 
-    const how = await w.webContents.executeJavaScript(submitLoginJs, true);
+    // 勾完协议要留一点时间让页面把状态更新完（登录按钮才会真正可用）。
+    // 实测抢着立刻点提交是无效的：页面毫无反应，也不报任何错。
+    await sleep(800);
+
+    const how = await frame.executeJavaScript(submitLoginJs, true);
     logger.info('[自动登录] 已提交（' + how + '）');
 
     const t0 = Date.now();
-    while (Date.now() - t0 < 25000) {
+    let pageHint = '';
+    while (Date.now() - t0 < 40000) {
       await sleep(1200);
       if (!w || w.isDestroyed()) break;
       const now = await snapshotCookies();
       const added = now.filter((c) => !loginBeforeKeys.has(c.name + '@' + c.domain) && c.valueLen > 12);
       const meaningful = added.filter((c) => !/uem|device|uuid|cookieId|task-session|logId|^gsm/i.test(c.name));
+      // 顺手看一眼页面上有没有报错：失败了至少能说清是密码错、要验证码还是被风控
+      try {
+        const hint = await w.webContents.executeJavaScript(
+          `(() => {
+             const t = (document.body ? document.body.innerText : '').replace(/\\s+/g, ' ');
+             const m = t.match(/(账号或密码[^ \\n]{0,16}|密码错误|验证码[^ \\n]{0,14}|操作(?:过于)?频繁|请稍后[^ \\n]{0,10}|账号不存在|已锁定|账号被冻结)/);
+             return m ? m[1] : '';
+           })()`,
+          true
+        );
+        if (hint) pageHint = hint;
+      } catch {}
       if (meaningful.length) {
         authState.loggedIn = true;
         authState.since = Date.now();
@@ -782,9 +865,24 @@ async function tryAutoLogin() {
         await backupPacTokenNow();
         saveAuthFile();
         logger.info('[自动登录] 成功（新增 Cookie：' + meaningful.map((c) => c.name).join(',') + '）');
+
+        // 别看拿到 Cookie 就以为完事了：登录成功后页面还要走一段回调
+        // （y.migu.cn/.../auth/index.html?...token=... → PostToken），
+        // 抢着关窗口会让服务端会话没建立完 —— 现象就是「这次登录成功，
+        // 下次启动又是未登录，而且反反复复」。
+        await sleep(3000);
+
+        // 换了一套会话之后必须让解析器页面重载：SDK 是拿页面里的 token 发请求的，
+        // 光往 localStorage 写值不会让它换身份，后续请求照样用旧 token 被拒。
+        await resolver.reboot().catch(() => {});
+
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.webContents.send('auth:changed', { ...authState, reason: 'auto' });
         }
+
+        // 立刻用新会话保活一次，把 pacmtoken 续上（它只靠请求续期）
+        keepAliveOnce('自动登录后');
+
         try {
           w.destroy();
         } catch {}
@@ -796,7 +894,8 @@ async function tryAutoLogin() {
     } catch {}
     return {
       ok: false,
-      reason: '提交后迟迟没拿到登录态（可能要验证码或触发了风控）',
+      // 页面上的报错提示最能说明问题（密码错？要验证码？被风控？）
+      reason: pageHint || '提交后迟迟没拿到登录态（可能要验证码或触发了风控）',
       needManual: true,
       username: cred.username,
     };
@@ -908,8 +1007,64 @@ const KEEPALIVE_INTERVAL_MS = 20 * 60 * 1000;
 let keepAliveTimer = null;
 let keepAliveKickoff = null;
 
+/**
+ * 服务端明确说「需要登录」时，用保存的账号密码补登一次。
+ *
+ * 为什么不能只靠启动时那次判断：本地 Cookie 一个不少，checkAuth() 就会认为已登录，
+ * 启动逻辑于是根本不进自动登录分支 —— 可服务端的 session 其实早就过期了。
+ * 用户看到的就是「登录已失效，而程序什么也没做」。所以只要服务端明确要登录，
+ * 就在这里补一次，而不是只记一条日志。
+ *
+ * 三重保护，免得反复弹登录页或触发风控：
+ *   - 没存过账号密码就不试
+ *   - 正在登就直接复用那一次（不并发开多个隐藏登录窗口）
+ *   - 60 秒内只试一次
+ */
+const AUTO_LOGIN_COOLDOWN_MS = 60 * 1000;
+let lastAutoReloginAt = 0;
+let autoReloginRunning = null;
+
+function autoRelogin(reason) {
+  if (!credentials.exists(LOGIN_DIR)) {
+    return Promise.resolve({ ok: false, reason: '没有保存账号密码' });
+  }
+  if (autoReloginRunning) return autoReloginRunning;
+
+  const waited = Date.now() - lastAutoReloginAt;
+  if (waited < AUTO_LOGIN_COOLDOWN_MS) {
+    return Promise.resolve({
+      ok: false,
+      reason: `距上次尝试仅 ${Math.round(waited / 1000)}s，先不重复试`,
+    });
+  }
+  lastAutoReloginAt = Date.now();
+  logger.info(`[自动登录] 服务端要求登录（${reason}），用保存的账号重登一次…`);
+
+  autoReloginRunning = tryAutoLogin()
+    .then((r) => {
+      // tryAutoLogin 成功时自己会广播 auth:changed，这里只补日志
+      if (r.ok) logger.info('[自动登录] 成功，登录态已恢复');
+      else logger.warn('[自动登录] 失败：' + r.reason);
+      return r;
+    })
+    .catch((e) => {
+      logger.warn('[自动登录] 异常：' + ((e && e.message) || e));
+      return { ok: false, reason: String((e && e.message) || e) };
+    })
+    .finally(() => {
+      autoReloginRunning = null;
+    });
+
+  return autoReloginRunning;
+}
+
 async function keepAliveOnce(reason) {
-  if (!authState.loggedIn) return;
+  // 本地认为未登录时保活没有意义；但如果存过账号密码，顺手补一次登录
+  // （启动那次自动登录可能因为网络或验证码失败，这里给个重试机会）
+  if (!authState.loggedIn) {
+    autoRelogin('本地未登录/' + reason);
+    return;
+  }
   try {
     const r = await resolver.webCall('/pc/user/home-page/v2.0');
     if (r && r.res && r.res.code === '000000') {
@@ -921,7 +1076,12 @@ async function keepAliveOnce(reason) {
       await backupPacTokenNow();
       if (hard.extended) logger.info(`[登录] 保活成功（${reason}），票据有效期已延长 ${hard.extended} 个`);
     } else {
-      logger.warn(`[登录] 保活请求未通过（${reason}）：` + ((r && r.res && r.res.info) || r.err || '未知原因'));
+      const info = (r && r.res && r.res.info) || r.err || '未知原因';
+      logger.warn(`[登录] 保活请求未通过（${reason}）：${info}`);
+      // 关键：服务端说需要登录时，别只记一条日志，用存好的账号补登一次
+      if (playlist.isNeedLogin(r && r.res && r.res.code, info)) {
+        autoRelogin('保活被拒/' + reason);
+      }
     }
   } catch (e) {
     logger.warn(`[登录] 保活异常（${reason}）：` + ((e && e.message) || e));
@@ -933,7 +1093,9 @@ function startSessionKeepAlive() {
   keepAliveTimer = setInterval(() => keepAliveOnce('定时'), KEEPALIVE_INTERVAL_MS);
   if (keepAliveTimer.unref) keepAliveTimer.unref();
   // 启动后不久先打一次招呼，别等到 20 分钟后
-  keepAliveKickoff = setTimeout(() => keepAliveOnce('启动'), 20000);
+  // 尽快确认一次服务端登录态：本地 Cookie 还在，不代表服务端还认账。
+  // 这一步被拒会自动触发补登，所以越早发现越好。
+  keepAliveKickoff = setTimeout(() => keepAliveOnce('启动'), 5000);
   if (keepAliveKickoff.unref) keepAliveKickoff.unref();
 }
 
@@ -960,12 +1122,9 @@ app.whenReady().then(async () => {
     notifyLyricChanged();
   });
   checkAuth().then((st) => {
-    // 启动时如果是未登录状态、且存过账号密码，就悄悄自动登录一次
-    if (st && !st.loggedIn && credentials.exists(LOGIN_DIR)) {
-      tryAutoLogin().then((r) => {
-        if (!r.ok) logger.info('[自动登录] 未成功：' + r.reason);
-      });
-    }
+    // 本地看是未登录就补一次。走 autoRelogin 这个统一入口 —— 它有节流和防重入，
+    // 免得和下面保活那次撞在一起、同时开出两个隐藏登录窗口。
+    if (st && !st.loggedIn) autoRelogin('启动时本地未登录');
   });
   startSessionKeepAlive();
   // 启动时记一笔票据清单：以后排查「登录态为什么没了」，

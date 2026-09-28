@@ -331,6 +331,7 @@ async function checkInPlaylists(contentIds) {
 }
 
 module.exports = {
+  isNeedLogin,
   getMyPlaylists,
   createPlaylist,
   deletePlaylist,
