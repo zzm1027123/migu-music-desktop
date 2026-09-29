@@ -116,10 +116,25 @@ async function markRestricted(container, songs) {
   }
   if (container.__markToken !== token || !document.body.contains(container)) return;
 
+  // 整批都被判成「不可播」基本可以断定这次查询没带上登录身份 ——
+  // 服务端对匿名用户一律回 VIP 曲目不可播。宁可不标，也不要整列表标错。
+  const judged = songs.map((s) => map[s.contentId]).filter(Boolean);
+  if (judged.length > 1 && judged.every((i) => !i.canListen)) {
+    console.warn('[标灰] 整批都被判为不可播，疑似未带登录身份，已跳过标注');
+    return;
+  }
+
   container.querySelectorAll('.song-row').forEach((row) => {
     const s = songs[Number(row.dataset.i)];
     if (!s) return;
     const info = map[s.contentId];
+    // 每次重标都先清掉上一次的结论：登录态变化后判定结果可能完全不同
+    row.classList.remove('restricted', 'trial');
+    row.removeAttribute('title');
+    const oldLock = row.querySelector('.tag-lock');
+    if (oldLock) oldLock.remove();
+    const oldTrial = row.querySelector('.tag-trial');
+    if (oldTrial) oldTrial.remove();
     if (!info) return;
     const nameEl = row.querySelector('.s-name');
     if (!info.canListen) {
@@ -141,6 +156,19 @@ async function markRestricted(container, songs) {
         nameEl.appendChild(t);
       }
     }
+  });
+}
+
+/**
+ * 重算当前视图里所有列表的灰标。
+ *
+ * 用在登录态刚恢复之后：客户端启动那一瞬间登录态可能还没就绪，此时 can-listen
+ * 是匿名查询，VIP 曲目会被判成不可播并标上灰。等身份回来了必须重算一遍，
+ * 否则会出现「明明能播的歌一直显示受限，点下去照样出声」。
+ */
+function remarkAllLists() {
+  document.querySelectorAll('.song-list').forEach((box) => {
+    if (box._songs && box._songs.length) markRestricted(box, box._songs);
   });
 }
 
@@ -2084,6 +2112,8 @@ window.migu.onAuthChanged((auth) => {
     toast('登录成功' + (auth.nickname ? '，欢迎 ' + auth.nickname : ''));
     // 如果用户是停在「我的音乐」页点的重新登录，登录成功后就地把歌单读出来
     if (state.view === 'mymusic' && view.querySelector('.login-cta')) renderMyMusic();
+    // 启动瞬间若登录态还没就绪，列表上的灰标是按匿名身份算出来的，必须重算
+    remarkAllLists();
   }
 });
 
